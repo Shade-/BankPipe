@@ -34,7 +34,7 @@ function task_bankpipe($task)
 		return $closest;
 	}
 
-	$where = (max($expiryDates)) ? ' AND expires < ' . max($expiryDates) : '';
+	$where = ($expiryDates and max($expiryDates)) ? ' AND expires < ' . max($expiryDates) : '';
 
 	require_once MYBB_ROOT . "inc/datahandlers/pm.php";
 	$pmhandler                 = new PMDataHandler();
