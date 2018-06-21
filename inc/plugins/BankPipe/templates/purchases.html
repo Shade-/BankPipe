@@ -1,0 +1,35 @@
+<html>
+	<head>
+		<title>{$lang->bankpipe_purchases_title}</title>
+		{$headerinclude}
+	</head>
+	<body>
+		{$header}
+		<table width="100%" border="0" align="center">
+			<tr>
+				{$usercpnav}
+				<td valign="top">
+					<table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder">
+						<thead>
+							<tr>
+								<td class="thead" colspan="3"><strong>{$lang->bankpipe_purchases_title}</strong></td>
+							</tr>
+							<tr>
+								<th class="tcat">{$lang->bankpipe_purchases_cat_attachment}</th>
+								<th class="tcat" align="center">{$lang->bankpipe_purchases_cat_cost}</th>
+								<th class="tcat" align="center">{$lang->bankpipe_purchases_cat_purchased}</th>
+							</tr>
+						</thead>
+						<tbody>
+							{$refunded}
+							{$purchases}
+							{$expired}
+							{$inactive}
+						</tbody>
+					</table>
+				</td>
+			</tr>
+		</table>
+		{$footer}
+	</body>
+</html>

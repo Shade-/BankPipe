@@ -1,0 +1,60 @@
+<script type="text/javascript" src="https://www.paypalobjects.com/api/checkout.js"></script>
+<script type="text/javascript">
+	$(document).ready(function() {
+
+		var CREATE_PAYMENT_URL  = '{$mybb->settings['bburl']}/bankpipe.php?action=create-payment';
+		var EXECUTE_PAYMENT_URL = '{$mybb->settings['bburl']}/bankpipe.php?action=execute-payment';
+
+		$('.purchase').each((key, item) => {
+
+			var id = $(item).attr('id');
+			
+			if (!id) {
+				id = "x" + Date.now();
+				$(item).attr('id', id);
+			}
+
+			paypal.Button.render({
+
+				env: '{$environment}',
+				commit: true, // Show a 'Pay Now' button
+				
+				style: {
+					tagline: false
+				},
+
+				payment: () => {
+					return paypal.request.post(CREATE_PAYMENT_URL, {
+						item: $(item).data('bid')
+					}).then((data) => {
+						return data.id;
+					});
+				},
+
+				onAuthorize: (data) => {
+					return paypal.request.post(EXECUTE_PAYMENT_URL, {
+						paymentID: data.paymentID,
+						payerID:   data.payerID
+					}).then((response) => {
+						
+						if (response.success) {
+							$.jGrowl(response.success, {theme: 'jgrowl_success'});
+						}
+						else if (response.error) {
+							$.jGrowl(response.error, {theme: 'jgrowl_error'});
+						}
+						
+						if (response.reload && response.success) {
+							setTimeout(() => {
+								location.reload();
+							}, 1000*response.reload);
+						}
+						
+					});
+				},
+
+			}, '#' + id);
+
+		});
+	});
+</script>

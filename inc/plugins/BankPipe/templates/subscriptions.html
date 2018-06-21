@@ -1,0 +1,32 @@
+<html>
+	<head>
+		<title>{$lang->bankpipe_subscriptions_title}</title>
+		{$headerinclude}
+	</head>
+	<body>
+		{$header}
+		<table width="100%" border="0" align="center">
+			<tr>
+				{$usercpnav}
+				<td valign="top">
+					{$errors}
+					<table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder">
+						<thead>
+							<tr>
+								<td class="thead" colspan="3"><strong>{$lang->bankpipe_subscriptions_title}</strong></td>
+							</tr>
+							<tr>
+								<th class="tcat" align="center">{$lang->bankpipe_subscriptions_cat_subscription}</td>
+								<th class="tcat" align="center">{$lang->bankpipe_subscriptions_cat_cost}</td>
+								<th class="tcat" style="width: 150px" align="center">{$lang->bankpipe_subscriptions_cat_purchase}</td>
+							</tr>
+						</thead>
+						{$subscriptions}
+					</table>
+				</td>
+			</tr>
+		</table>
+		{$script}
+		{$footer}
+	</body>
+</html>

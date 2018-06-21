@@ -1,0 +1,15 @@
+<tr>
+	<td class="trow1" width="40%">
+		{$icon} <a href="attachments.php?aid={$item['aid']}" target="_blank">{$item['filename']}</a>
+	</td>
+	<td class="trow1" width="10%">
+		{$size}
+	</td>
+	<td class="trow1">
+		<a href="{$item['postlink']}#pid{$item['pid']}">{$item['subject']}</a>
+	</td>
+	<td class="trow1" width="10%">
+		<input type="text" class="textbox" name="items[{$item['bid']}]" value="{$item['price']}" />
+		<input type="hidden" name="olditems[{$item['bid']}]" value="{$item['price']}" />
+	</td>
+</tr>
