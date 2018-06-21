@@ -7,7 +7,7 @@
  * @package BankPipe
  * @license Copyrighted ©
  * @author  Shade <shad3-@outlook.com>
- * @version beta 1
+ * @version beta 2
  */
 
 if (!defined('IN_MYBB')) {
@@ -56,7 +56,7 @@ function bankpipe_info()
 		'description'   =>  'A fully functional payment system for MyBB.' . $description,
 		'website'       =>  'https://www.mybboost.com/forum-bankpipe',
 		'author'        =>  'Shade',
-		'version'       =>  'beta 1',
+		'version'       =>  'beta 2',
 		'compatibility' =>  '18*',
 	];
 }
@@ -144,6 +144,20 @@ function bankpipe_install()
 			'description' => $lang->setting_bankpipe_notification_uid_desc,
 			'optionscode' => 'text',
 			'value' => ''
+		],
+		'admin_notification' => [
+			'title' => $lang->setting_bankpipe_admin_notification,
+			'description' => $lang->setting_bankpipe_admin_notification_desc,
+			'optionscode' => 'text',
+			'value' => ''
+		],
+		'admin_notification_method' => [
+			'title' => $lang->setting_bankpipe_admin_notification_method,
+			'description' => $lang->setting_bankpipe_admin_notification_method_desc,
+			'optionscode' => "select
+pm=Private message
+email=Email",
+			'value' => 'pm'
 		]
 
 	];
@@ -221,6 +235,7 @@ function bankpipe_install()
 			sale text,
 			refund text,
 			email text,
+			price decimal(6,2) NOT NULL,
 			payer_id varchar(32) NOT NULL DEFAULT '',
 			invoice varchar(32) NOT NULL DEFAULT '',
 			bid int(10) NOT NULL DEFAULT '0',
@@ -465,6 +480,9 @@ if (defined('IN_ADMINCP')) {
 
 	// Advertising
 	$plugins->add_hook("admin_load", "bankpipe_ad");
+
+	// Update
+	$plugins->add_hook("admin_page_output_header", "bankpipe_update");
 
 	// Module
 	$plugins->add_hook("admin_config_menu", "bankpipe_admin_config_menu");
@@ -1380,6 +1398,15 @@ function bankpipe_save_paid_item()
 }
 
 // ADMINCP ROUTINES
+function bankpipe_update()
+{
+	$file = MYBB_ROOT . "inc/plugins/BankPipe/update.php";
+
+	if (file_exists($file)) {
+		require_once $file;
+	}
+}
+
 function bankpipe_admin_config_menu($sub_menu)
 {
 	global $lang;

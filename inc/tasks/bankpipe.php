@@ -54,7 +54,7 @@ function task_bankpipe($task)
 	if ($subscriptions) {
 
 		// Get associated items
-		$items = [];
+		$items = $emails = $users = [];
 
 		$query = $db->simple_select('bankpipe_items', 'name, primarygroup, price, bid', 'bid IN (' . implode(',', array_keys($subscriptions)) . ')');
 		while($item = $db->fetch_array($query)) {
@@ -62,7 +62,6 @@ function task_bankpipe($task)
 		}
 
 		// Get users usernames
-		$users = [];
 		$query = $db->simple_select('users', 'uid, username, usergroup, additionalgroups, email', 'uid IN (' . implode(',', $uids) . ')');
 		while($user = $db->fetch_array($query)) {
 			$users[$user['uid']] = $user;
@@ -119,7 +118,7 @@ function task_bankpipe($task)
 			// Send reminder
 			$closest = closest($subscription['expires'], $expiryDates);
 			$notification = $notifications[$closest];
-			
+
 			// Send only when expired if daysbefore = 0
 			if ($notification['daysbefore'] == 0 and $subscription['expires'] > $now) {
 				$keys = array_keys($notifications);
@@ -173,10 +172,6 @@ function task_bankpipe($task)
 						]
 					];
 
-					$pm['options'] = [
-						"signature" => 1
-					];
-
 					$pmhandler->set_data($pm);
 
 					// Now let the PM handler do all the hard work
@@ -187,16 +182,14 @@ function task_bankpipe($task)
 				}
 				else if ($notification['method'] == 'email' and $users[$subscription['uid']]['email']) {
 
-					$email = array(
+					$emails[] = [
 						"mailto" => $db->escape_string($users[$subscription['uid']]['email']),
 						"mailfrom" => '',
 						"subject" => $db->escape_string($title),
 						"message" => $db->escape_string($message),
 						"headers" => ''
-					);
+					];
 
-					$db->insert_query("mailqueue", $email);
-					
 					$update_mailqueue = true;
 
 				}
@@ -205,6 +198,10 @@ function task_bankpipe($task)
 
 			}
 
+		}
+
+		if ($emails) {
+			$db->insert_query_multiple("mailqueue", $emails);
 		}
 
 		if ($update_mailqueue) {

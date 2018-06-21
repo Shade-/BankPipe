@@ -51,7 +51,7 @@ if (in_array($mybb->input['action'], ['edit_purchase', 'refund_purchase'])) {
 
 }
 
-// Add subscription
+// Add/edit/delete subscription
 if ($mybb->input['action'] == 'manage_subscription') {
 
 	// Get this subscription
@@ -78,7 +78,7 @@ if ($mybb->input['action'] == 'manage_subscription') {
 
 		$price = $mybb->input['price'];
 
-		if (!$price or $price <= 0) {
+		if (!$mybb->input['delete'] and (!$price or $price <= 0)) {
 			flash_message($lang->bankpipe_error_price_not_valid, 'error');
 			admin_redirect(MAINURL);
 		}
@@ -96,7 +96,11 @@ if ($mybb->input['action'] == 'manage_subscription') {
 			'expirygid' => (int) $mybb->input['expirygid']
 		];
 
-		if (!$bid) {
+		if ($mybb->input['delete']) {
+			$message = $lang->bankpipe_success_subscription_deleted;
+			$db->delete_query('bankpipe_items', "bid IN ('" . implode("','", (array) $mybb->input['delete']) . "')");
+		}
+		else if (!$bid) {
 			$message = $lang->bankpipe_success_subscription_added;
 			$db->insert_query('bankpipe_items', $data);
 		}
@@ -153,12 +157,10 @@ if ($mybb->input['action'] == 'manage_subscription') {
 		'id' => 'price'
 	]), 'price');
 
-	if (!$mybb->input['gid']) {
-		$mybb->input['gid'] = 2;
-	}
-
 	// Subscription usergroup
-	$subusergroups = [];
+	$subusergroups = [
+		$lang->bankpipe_manage_subscription_use_default_usergroup
+	];
 
 	$groups_cache = $cache->read('usergroups');
 	unset($groups_cache[1]); // 1 = guests. Exclude them
@@ -209,7 +211,7 @@ else if ($mybb->input['action'] == 'logs') {
 	if ($mybb->input['delete'] and $mybb->request_method == 'post') {
 
 		if ($mybb->input['delete']) {
-			$db->delete_query('bankpipe_log', 'lid IN (' . implode(',', array_keys((array) $mybb->input['delete'])) . ')');
+			$db->delete_query('bankpipe_log', "lid IN ('" . implode("','", (array) $mybb->input['delete']) . "')");
 		}
 
 		// Redirect
@@ -258,13 +260,14 @@ else if ($mybb->input['action'] == 'logs') {
 	$table->construct_header($lang->bankpipe_logs_header_action);
 	$table->construct_header($lang->bankpipe_logs_header_item, ['width' => '40%']);
 	$table->construct_header($lang->bankpipe_logs_header_date, ['width' => '10%']);
-	$table->construct_header($lang->bankpipe_logs_header_delete, ['width' => '1px']);
+	$table->construct_header($lang->bankpipe_delete, ['width' => '1px', 'style' => 'text-align: center']);
 
 	$query = $db->query('
-		SELECT l.*, i.name, i.price, u.username, u.usergroup, u.displaygroup, u.avatar
+		SELECT l.*, i.name, p.price, u.username, u.usergroup, u.displaygroup, u.avatar
 		FROM ' . TABLE_PREFIX . 'bankpipe_log l
 		LEFT JOIN ' . TABLE_PREFIX . 'users u ON (u.uid = l.uid)
 		LEFT JOIN ' . TABLE_PREFIX . 'bankpipe_items i ON (i.bid = l.bid)
+		LEFT JOIN ' . TABLE_PREFIX . 'bankpipe_payments p ON (p.pid = l.pid)
 		ORDER BY l.date DESC
 		LIMIT ' . (int) $start . ', ' . (int) $perpage . '
 	');
@@ -333,7 +336,7 @@ else if ($mybb->input['action'] == 'logs') {
 		$table->construct_cell(my_date('relative', $log['date']));
 
 		// Delete
-		$table->construct_cell($form->generate_check_box("delete[{$log['lid']}]", 1));
+		$table->construct_cell($form->generate_check_box("delete[]", $log['lid']), ['style' => 'text-align: center']);
 		$table->construct_row();
 
 	}
@@ -424,7 +427,6 @@ else if (in_array($mybb->input['action'], ['edit_purchase', 'revoke_purchase', '
 		$mybb->input['expires'] = strtotime(str_replace('/', '-', $mybb->input['expires']));
 
 		$data = [
-			'newgid' => (int) $mybb->input['newgid'],
 			'oldgid' => (int) $mybb->input['oldgid'],
 			'active' => (int) $mybb->input['active'],
 			'expires' => (int) $mybb->input['expires']
@@ -555,7 +557,56 @@ else if ($mybb->input['action'] == 'history') {
 
 	$page->output_nav_tabs($sub_tabs, 'history');
 
+	// Sorting
+	$form = new Form(MAINURL . "&amp;action=history&amp;sort=true", "post", "history");
+	$form_container = new FormContainer();
+
+	$form_container->output_row('', '', $form->generate_text_box('username', $mybb->input['username'], [
+		'id' => 'username',
+		'style' => '" placeholder="' . $lang->bankpipe_history_username
+	]) . ' ' . $form->generate_text_box('startingdate', $mybb->input['startingdate'], [
+		'id' => 'startingdate',
+		'style' => '" placeholder="' . $lang->bankpipe_history_startingdate . '" autocomplete="off'
+	]) . ' ' . $form->generate_text_box('endingdate', $mybb->input['endingdate'], [
+		'id' => 'endingdate',
+		'style' => '" placeholder="' . $lang->bankpipe_history_endingdate . '" autocomplete="off'
+	]) . ' ' . $form->generate_submit_button($lang->bankpipe_filter), 'sort');
+
+	$form_container->end();
+	$form->end();
+
+	$where = [];
+	if ($mybb->input['sort']) {
+
+		if ($mybb->input['username']) {
+			$where[] = "u.username LIKE '%" . $db->escape_string($mybb->input['username']) . "%'";
+		}
+
+		if ($mybb->input['startingdate']) {
+			$where[] = "p.date >= " . (int) strtotime(str_replace('/', '-', $mybb->input['startingdate']));
+		}
+
+		if ($mybb->input['endingdate']) {
+			$where[] = "p.date <= " . (int) strtotime(str_replace('/', '-', $mybb->input['endingdate']));
+		}
+
+	}
+
+	$whereStatement = ($where) ? 'WHERE ' . implode(' AND ', $where) : '';
+
+	// Paging
 	$perpage = 20;
+	$sortingOptions = ['username', 'startingdate', 'endingdate'];
+	$sortingString = '';
+	foreach ($sortingOptions as $opt) {
+		if ($mybb->input[$opt]) {
+			$sortingString .= '&amp;' . $opt . '=' . $mybb->input[$opt];
+		}
+	}
+
+	if ($sortingString) {
+		$sortingString .= '&amp;sort=true';
+	}
 
 	if (!isset($mybb->input['page'])) {
 		$mybb->input['page'] = 1;
@@ -572,13 +623,21 @@ else if ($mybb->input['action'] == 'history') {
 		$mybb->input['page'] = 1;
 	}
 
-	$query = $db->simple_select('bankpipe_payments', 'COUNT(pid) AS num_results');
-	$num_results = $db->fetch_field($query, 'num_results');
+	$query = $db->query('
+		SELECT COUNT(p.pid) AS num_results, SUM(p.price) AS revenue
+		FROM ' . TABLE_PREFIX . 'bankpipe_payments p
+		LEFT JOIN ' . TABLE_PREFIX . 'users u ON (u.uid = p.uid)
+		' . $whereStatement);
+	$result = $db->fetch_array($query);
+
+	$num_results = (int) $result['num_results'];
+	$revenue = (int) $result['revenue'];
 
 	if ($num_results > $perpage) {
-		echo draw_admin_pagination($mybb->input['page'], $perpage, $num_results, MAINURL . "&amp;action=history");
+		echo draw_admin_pagination($mybb->input['page'], $perpage, $num_results, MAINURL . "&amp;action=history" . $sortingString);
 	}
 
+	// Main view
 	$table = new Table;
 
 	$table->construct_header($lang->bankpipe_history_header_user, ['width' => '15%']);
@@ -588,10 +647,11 @@ else if ($mybb->input['action'] == 'history') {
 	$table->construct_header($lang->bankpipe_history_header_options, ['width' => '10%']);
 
 	$query = $db->query('
-		SELECT p.*, i.name, i.price, u.username, u.usergroup, u.displaygroup, u.avatar
+		SELECT p.*, i.name, u.username, u.usergroup, u.displaygroup, u.avatar
 		FROM ' . TABLE_PREFIX . 'bankpipe_payments p
 		LEFT JOIN ' . TABLE_PREFIX . 'users u ON (u.uid = p.uid)
 		LEFT JOIN ' . TABLE_PREFIX . 'bankpipe_items i ON (i.bid = p.bid)
+		' . $whereStatement . '
 		ORDER BY p.date DESC
 		LIMIT ' . (int) $start . ', ' . (int) $perpage . '
 	');
@@ -607,11 +667,17 @@ else if ($mybb->input['action'] == 'history') {
 
 		// Expires
 		$class = $extra = '';
+
+		if ($purchase['price'] > 0) {
+			$extra .= ' – ' . $purchase['price'] . ' ' . $mybb->settings['bankpipe_currency'];
+		}
+
 		$expires = ($purchase['expires']) ? my_date('relative', $purchase['expires']) : $lang->bankpipe_history_expires_never;		
 		if ($purchase['refund']) {
 
 			$extra = $lang->bankpipe_history_refunded;
 			$class = 'refunded';
+			$revenue -= $purchase['price'];
 
 		}
 		else if ($purchase['expires'] and $purchase['expires'] < TIME_NOW) {
@@ -655,6 +721,11 @@ else if ($mybb->input['action'] == 'history') {
 		$table->construct_row();
 	}
 
+	if ($revenue > 0) {
+		$table->construct_cell($lang->sprintf($lang->bankpipe_history_revenue, $revenue, $mybb->settings['bankpipe_currency']), ['colspan' => 5, 'style' => 'text-align: center']);
+		$table->construct_row();
+	}
+
 	$table->output($lang->bankpipe_history);
 
 	echo <<<HTML
@@ -670,6 +741,17 @@ else if ($mybb->input['action'] == 'history') {
 		background: lightblue!important
 	}
 </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/datepicker/0.6.5/datepicker.min.css" type="text/css" />
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/datepicker/0.6.5/datepicker.min.js"></script>
+<script type="text/javascript">
+<!--
+// Date picking
+var expiry = $("#startingdate, #endingdate").datepicker({
+	autoHide: true,
+	format: 'dd/mm/yyyy'
+})
+-->
+</script>
 HTML;
 
 }
@@ -682,26 +764,31 @@ else if ($mybb->input['action'] == 'notifications') {
 
 	$page->output_nav_tabs($sub_tabs, 'notifications');
 
+	$form = new Form(MAINURL . "&amp;action=manage_notification&amp;delete=true", "post", "manage_notification");
+
 	$table = new Table;
 
 	$table->construct_header($lang->bankpipe_notifications_header_notification);
 	$table->construct_header($lang->bankpipe_notifications_header_days_before, ['width' => '200px']);
+	$table->construct_header($lang->bankpipe_delete, ['width' => '1px', 'style' => 'text-align: center']);
 
 	$query = $db->simple_select('bankpipe_notifications', '*');
 	while ($notification = $db->fetch_array($query)) {
 
 		$table->construct_cell("<a href='" . MAINURL . "&amp;action=manage_notification&amp;nid={$notification['nid']}'>{$notification['title']}</a>");
-		$table->construct_cell($notification['daysbefore']);
+		$table->construct_cell($notification['daysbefore'], ['style' => 'text-align: center']);
+		$table->construct_cell($form->generate_check_box("delete[]", $notification['nid']), ['style' => 'text-align: center']);
 		$table->construct_row();
 
-	}
-
-	if ($db->num_rows($query) == 0) {
-		$table->construct_cell($lang->bankpipe_notifications_no_notification, ['colspan' => 2]);
-		$table->construct_row();
 	}
 
 	$table->output($lang->bankpipe_notifications . $lang->bankpipe_new_notification);
+
+	$buttons = [
+		$form->generate_submit_button($lang->bankpipe_notifications_delete)
+	];
+	$form->output_submit_wrapper($buttons);
+	$form->end();
 
 }
 // Manual mode
@@ -709,7 +796,7 @@ else if ($mybb->input['action'] == 'manual_add') {
 
 	$subscriptions = $users = $uids = [];
 
-	$query = $db->simple_select('bankpipe_items', 'bid, name, gid, primarygroup', "gid <> 0", ['order_by' => 'price ASC']);
+	$query = $db->simple_select('bankpipe_items', 'bid, name, gid, primarygroup, expirygid', "gid <> 0", ['order_by' => 'price ASC']);
 	while ($subscription = $db->fetch_array($query)) {
 		$subscriptions[$subscription['bid']] = $subscription;
 	}
@@ -753,6 +840,10 @@ else if ($mybb->input['action'] == 'manual_add') {
 		// Normalize uids array
 		if ($uids) {
 			$uids = array_filter($uids);
+		}
+
+		if (empty($uids)) {
+			admin_redirect(MAINURL . '&amp;action=manual_add');
 		}
 
 		if ($startDate > TIME_NOW or ($endDate and $endDate < TIME_NOW)) {
@@ -814,7 +905,7 @@ else if ($mybb->input['action'] == 'manual_add') {
 				'newgid' => (int) $subscriptions[$bid]['gid']
 			];
 
-			$arr['oldgid'] = ($subscription[$bid]['expirygid']) ? (int) $subscription[$bid]['expirygid'] : (int) $users[$uid]['usergroup'];
+			$arr['oldgid'] = ($subscriptions[$bid]['expirygid']) ? (int) $subscriptions[$bid]['expirygid'] : (int) $users[$uid]['usergroup'];
 
 			$data[] = $arr;
 
@@ -949,7 +1040,7 @@ $("#users").select2({
 </script>';
 
 }
-// Edit/add notification
+// Edit/add/delete notification
 else if ($mybb->input['action'] == 'manage_notification') {
 
 	// Get this notification
@@ -976,7 +1067,11 @@ else if ($mybb->input['action'] == 'manage_notification') {
 			'method' => $db->escape_string($mybb->input['method'])
 		];
 
-		if (!$nid) {
+		if ($mybb->input['delete']) {
+			$message = $lang->bankpipe_success_notification_deleted;
+			$db->delete_query('bankpipe_notifications', "nid IN ('" . implode("','", (array) $mybb->input['delete']) . "')");
+		}
+		else if (!$nid) {
 			$message = $lang->bankpipe_success_notification_added;
 			$db->insert_query('bankpipe_notifications', $data);
 		}
@@ -987,7 +1082,7 @@ else if ($mybb->input['action'] == 'manage_notification') {
 
 		// Redirect
 		flash_message($message, 'success');
-		admin_redirect(MAINURL);
+		admin_redirect(MAINURL . '&amp;action=notifications');
 
 	}
 
@@ -1052,16 +1147,20 @@ else if (!$mybb->input['action']) {
 
 	$page->output_nav_tabs($sub_tabs, 'general');
 
+	$form = new Form(MAINURL . "&amp;action=manage_subscription&amp;delete=true", "post", "manage_subscription");
+
 	$table = new Table;
 
 	$table->construct_header($lang->bankpipe_subscriptions_name);
 	$table->construct_header($lang->bankpipe_subscriptions_price);
+	$table->construct_header($lang->bankpipe_delete, ['width' => '1px', 'style' => 'text-align: center']);
 
 	$query = $db->simple_select('bankpipe_items', '*', "gid <> 0", ['order_by' => 'price ASC']);
 	while ($subscription = $db->fetch_array($query)) {
 
 		$table->construct_cell("<a href='" . MAINURL . "&amp;action=manage_subscription&amp;bid={$subscription['bid']}'>{$subscription['name']}</a>");
 		$table->construct_cell($subscription['price']);
+		$table->construct_cell($form->generate_check_box("delete[]", $subscription['bid']), ['style' => 'text-align: center']);
 		$table->construct_row();
 
 	}
@@ -1072,6 +1171,12 @@ else if (!$mybb->input['action']) {
 	}
 
 	$table->output($lang->bankpipe_overview_available_subscriptions . $lang->bankpipe_new_subscription);
+
+	$buttons = [
+		$form->generate_submit_button($lang->bankpipe_subscriptions_delete)
+	];
+	$form->output_submit_wrapper($buttons);
+	$form->end();
 
 }
 

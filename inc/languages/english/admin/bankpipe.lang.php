@@ -25,6 +25,10 @@ $l['setting_bankpipe_forums'] = "Allowed forums";
 $l['setting_bankpipe_forums_desc'] = "Choose what forums can hold paid items. Leave blank to allow every forum.";
 $l['setting_bankpipe_notification_uid'] = "Notification sender";
 $l['setting_bankpipe_notification_uid_desc'] = "Enter the uid of the user you want to use as sender for expire notifications by PM. If a notification is sent by email, the board's internal notification email is used regardless of this option. Leave blank to use the MyBB Engine.";
+$l['setting_bankpipe_admin_notification'] = "Admin notification";
+$l['setting_bankpipe_admin_notification_desc'] = "Enter a comma-separated list of uids to send a notification when an user purchases something. If you want to send the notification to a single user, just enter the uid without any other characters. Leave blank to not send any notification.";
+$l['setting_bankpipe_admin_notification_method'] = "Admin notification method";
+$l['setting_bankpipe_admin_notification_method_desc'] = "Choose the notification method for admin notifications.";
 
 // Module
 $l['bankpipe'] = 'BankPipe';
@@ -61,8 +65,8 @@ $l['bankpipe_manage_subscription_expires_desc'] = 'Enter an expiry amount of day
 $l['bankpipe_manage_subscription_expiry_usergroup'] = 'Expiry usergroup';
 $l['bankpipe_manage_subscription_expiry_usergroup_desc'] = 'If an expiry amount of days is specified, users will be reverted to the primary usergroup they had before the subscription. This option lets you override the destination usergroup and when this subscription expires, users\' primary usergroup will be changed to this.';
 $l['bankpipe_manage_subscription_use_default_usergroup'] = 'Inherit user\'s primary usergroup';
-$l['bankpipe_save'] = 'Save';
 $l['bankpipe_subscriptions_no_subscription'] = 'There are no subscriptions at the moment. <a href="index.php?module=config-bankpipe&amp;action=manage_subscription">Add subscription</a>.';
+$l['bankpipe_subscriptions_delete'] = 'Delete selected subscription(s)';
 
 // Notifications
 $l['bankpipe_notifications'] = 'Notifications';
@@ -70,6 +74,7 @@ $l['bankpipe_notifications_desc'] = 'Manage expiry notifications. They can be se
 $l['bankpipe_notifications_header_notification'] = 'Notification';
 $l['bankpipe_notifications_header_days_before'] = 'Days sent before expiry';
 $l['bankpipe_notifications_no_notification'] = 'There are no notifications at the moment. <a href="index.php?module=config-bankpipe&amp;action=manage_notification">Add notification</a>.';
+$l['bankpipe_notifications_delete'] = 'Delete selected notification(s)';
 $l['bankpipe_add_notification'] = 'Add notification';
 $l['bankpipe_edit_notification'] = 'Edit notification – {1}';
 $l['bankpipe_manage_notification_title'] = 'Title';
@@ -88,7 +93,6 @@ $l['bankpipe_logs_header_user'] = $l['bankpipe_history_header_user'] = 'User';
 $l['bankpipe_logs_header_action'] = 'Action taken';
 $l['bankpipe_logs_header_item'] = 'Purchase handled';
 $l['bankpipe_logs_header_date'] = $l['bankpipe_history_header_date'] = 'Date';
-$l['bankpipe_logs_header_delete'] = 'Delete';
 $l['bankpipe_logs_no_logs'] = 'There are currently no payment logs to display.';
 $l['bankpipe_logs_error'] = 'Error';
 $l['bankpipe_logs_created'] = 'Payment created';
@@ -107,10 +111,14 @@ $l['bankpipe_history_expires_expired'] = 'Expired';
 $l['bankpipe_history_inactive'] = ' – Inactive';
 $l['bankpipe_history_refunded'] = ' – Refunded';
 $l['bankpipe_history_header_options'] = 'Options';
-$l['bankpipe_history_no_payments'] = 'There is currently no transaction history to display.';
+$l['bankpipe_history_no_payments'] = 'There are currently no payments completed with the specified parameters selected.';
 $l['bankpipe_history_edit'] = 'Edit';
 $l['bankpipe_history_refund'] = 'Refund';
 $l['bankpipe_history_revoke'] = 'Revoke';
+$l['bankpipe_history_username'] = 'Username';
+$l['bankpipe_history_startingdate'] = 'Start date';
+$l['bankpipe_history_endingdate'] = 'End date';
+$l['bankpipe_history_revenue'] = '<b>Revenue</b>: {1} {2}';
 
 // Manual add
 $l['bankpipe_manual_add'] = 'Subscribe users';
@@ -152,13 +160,16 @@ $l['bankpipe_refund_purchase_amount_desc'] = 'Enter a refund amount. If left bla
 // Messages
 $l['bankpipe_success_subscription_added'] = 'Subscription created successfully.';
 $l['bankpipe_success_subscription_edited'] = 'Subscription edited successfully.';
+$l['bankpipe_success_subscription_deleted'] = 'Subscription deleted successfully.';
 $l['bankpipe_success_notification_added'] = 'Notification created successfully.';
 $l['bankpipe_success_notification_edited'] = 'Notification edited successfully.';
+$l['bankpipe_success_notification_deleted'] = 'Notification deleted successfully.';
 $l['bankpipe_success_users_added'] = 'The user(s) you have specified have been subscribed successfully to the selected subscription plan.';
 $l['bankpipe_success_deleted_selected_logs'] = 'The log(s) you have selected have been deleted successfully.';
 $l['bankpipe_success_purchase_edited'] = 'The purchase has been edited successfully.';
 $l['bankpipe_success_purchase_refunded'] = 'The purchase has been refunded successfully. {1} have been sent to the user. This transaction costed {2} to the payee in PayPal refund fees.';
 $l['bankpipe_success_purchase_revoked'] = 'The purchase has been revoked successfully and the user has been reverted to the usergroup he was in before.';
+$l['bankpipe_success_updated'] = "BankPipe has been updated correctly from version {1} to {2}. Good job!";
 
 $l['bankpipe_error_missing_default_payee'] = 'The default payee is missing. Please specify one before attempting to create a subscription.';
 $l['bankpipe_error_price_not_valid'] = 'The price you entered does not look to be a valid price. Please enter a positive number, either integer or with decimals separated by a dot.';
@@ -167,6 +178,7 @@ $l['bankpipe_error_invalid_purchase'] = 'This purchase appears to be invalid.';
 $l['bankpipe_error_invalid_notification'] = 'This notification appears to be invalid.';
 $l['bankpipe_error_missing_subscriptions'] = 'Before attempting to add an user to a subscription plan, please create a subscription plan.';
 $l['bankpipe_error_incorrect_dates'] = 'The dates you selected are not valid. Please enter a past date for the starting one and a future date for the ending one.';
+$l['bankpipe_error_needtoupdate'] = "You seem to have currently installed an outdated version of BankPipe. Please <a href=\"index.php?module=config-settings&amp;update=bankpipe\">click here</a> to run the upgrade script.";
 
 // Tasks
 $l['task_bankpipe_ran'] = 'BankPipe cleanup task has ran successfully.';
@@ -176,5 +188,8 @@ $l['viewing_field_candownloadpaidattachments'] = $l['bankpipe_can_dl_paid_attach
 
 // Misc
 $l['bankpipe_options'] = 'Options';
+$l['bankpipe_delete'] = 'Delete';
+$l['bankpipe_save'] = 'Save';
+$l['bankpipe_filter'] = 'Filter';
 $l['bankpipe_new_subscription'] = '<a href="index.php?module=config-bankpipe&amp;action=manage_subscription" style="float: right">Add subscription</a>';
 $l['bankpipe_new_notification'] = '<a href="index.php?module=config-bankpipe&amp;action=manage_notification" style="float: right">Add notification</a>';

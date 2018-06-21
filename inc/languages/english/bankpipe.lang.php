@@ -43,6 +43,15 @@ $l['bankpipe_subscriptions_cat_purchase'] = "Purchase";
 $l['bankpipe_subscriptions_not_available'] = "There are currently no subscriptions available.";
 $l['bankpipe_subscriptions_current_plan'] = "Current active plan";
 
+// Notifications
+$l['bankpipe_notification_purchase_title'] = "{1} has purchased {2} for {3}";
+$l['bankpipe_notification_purchase'] = "Dear manager or accountant,
+[url={2}]{1}[/url] has purchased [b]{3}[/b] spending [b]{4}[/b]. The money has already been sent to your PayPal account and should be available in some minutes.{5}
+
+Best regards,
+{6}";
+$l['bankpipe_notification_purchase_moved'] = " He has been moved successfully from {1} to {2}.";
+
 // Messages
 $l['bankpipe_error_could_not_complete'] = "Your payment may have completed but the transaction (state: {1}) may have been put on hold for some reason. Therefore, you have not been granted access to what you were trying to purchase. Please get in touch with an administrator to solve this issue.<br><br>Thank you for your comprehension.";
 $l['bankpipe_error_pending_payment'] = "Your payment is currently pending completion. At the current stages, we can't handle your payment automatically. Therefore, you have not been granted access to what you were trying to purchase. Please get in touch with an administrator to complete your purchase.<br><br>Thank you for your comprehension.";

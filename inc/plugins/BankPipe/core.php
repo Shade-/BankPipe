@@ -101,13 +101,13 @@ class BankPipe
 				SELECT MAX(i.price) AS price, p.payment_id
 				FROM ' . TABLE_PREFIX . 'bankpipe_items i
 				LEFT JOIN ' . TABLE_PREFIX . 'bankpipe_payments p ON (p.uid = ' . (int) $mybb->user['uid'] . ' AND p.bid = i.bid AND p.active = 1)
-				WHERE gid <> 0 AND p.payment_id IS NOT NULL AND i.bid <> ' . (int) $item['bid'] . '
+				WHERE i.gid <> 0 AND p.payment_id IS NOT NULL AND i.bid <> ' . (int) $item['bid'] . '
 				LIMIT 1
 			');
 			$oldSubscription = $db->fetch_array($query);
 
 			// If found, calculate discount relative to that
-			if ($oldSubscription['payment_id']) {
+			if ($oldSubscription['price']) {
 				$price = ($item['price'] - ($oldSubscription['price'] * $item['discount'] / 100));
 			}
 			// Not found, apply discount relative to the current price
@@ -242,7 +242,8 @@ class BankPipe
 			'payer_id' => $db->escape_string($payment->payer->payer_info->payer_id),
 			'payee' => $payee,
 			'invoice' => $db->escape_string($transactions[0]->invoice_number),
-			'date' => TIME_NOW
+			'date' => TIME_NOW,
+			'price' => $transactions[0]->amount->total
 		];
 
 		// Get purchased item data
@@ -288,6 +289,118 @@ class BankPipe
 
 		$db->insert_query('bankpipe_payments', $data);
 		$pid = $db->insert_id();
+
+		// If enabled, send out a reminder to a specified list of admins
+		if ($mybb->settings['bankpipe_admin_notification'] or $payee['uid']) {
+
+			$update_mailqueue = false;
+
+			$uids = explode(',', $mybb->settings['bankpipe_admin_notification']);
+
+			// Add the payee to the notification list, if available
+			if ($payee['uid']) {
+				$uids[] = $payee['uid'];
+			}
+
+			$uids = array_filter(array_unique(array_map('intval', $uids)));
+
+			if (count($uids) > 0) {
+
+				$mailqueue = $emails = $ugroups = [];
+
+				$query = $db->simple_select('users', 'uid, username', 'uid = ' . $data['uid'], ['limit' => 1]);
+				$buyer = $db->fetch_array($query);
+
+				$query = $db->simple_select('usergroups', 'gid, title', "gid IN ('{$data['oldgid']}', '{$data['newgid']}')");
+				while ($ugroup = $db->fetch_array($query)) {
+					$ugroups[$ugroup['gid']] = $ugroup['title'];
+				}
+
+				// Prepare the message
+				$buyer['link'] = $mybb->settings['bburl'] . '/' . get_profile_link($buyer['uid']);
+
+				$moved = ($data['oldgid'] != $data['newgid']) ? $lang->sprintf($lang->bankpipe_notification_purchase_moved, $ugroups[$data['oldgid']], $ugroups[$data['newgid']]) : '';
+
+				require_once MYBB_ROOT."inc/class_parser.php";
+				$parser = new postParser;
+				$parserOptions = [
+					'allow_mycode' => 1,
+					'allow_imgcode' => 1,
+					'allow_videocode' => 1,
+					'allow_smilies' => 1,
+					'filter_badwords' => 1
+				];
+
+				$title = $lang->sprintf($lang->bankpipe_notification_purchase_title, $buyer['username'], $item['name'], $data['price'] . $mybb->settings['bankpipe_currency']);
+				$message = $lang->sprintf($lang->bankpipe_notification_purchase, $buyer['username'], $buyer['link'], $item['name'], $data['price'] . $mybb->settings['bankpipe_currency'], $moved, $mybb->settings['bbname']);
+				$message = $parser->parse_message($message, $parserOptions);
+
+				// Cache user emails
+				if ($mybb->settings['bankpipe_admin_notification_method'] != 'pm') {
+
+					$query = $db->simple_select('users', 'uid, email', 'uid IN (' . implode(',', $uids) . ')');
+					while ($user = $db->fetch_array($query)) {
+
+						if ($user['email']) {
+							$emails[$user['uid']] = $user['email'];
+						}
+
+					}
+
+				}
+
+				// Send notification
+				foreach ($uids as $uid) {
+
+					if ($mybb->settings['bankpipe_admin_notification_method'] == 'pm') {
+
+						require_once MYBB_ROOT . "inc/datahandlers/pm.php";
+						$pmhandler                 = new PMDataHandler();
+						$pmhandler->admin_override = true;
+
+						$pm = [
+							"subject" => $title,
+							"message" => $message,
+							"fromid" => -1,
+							"toid" => [
+								$uid
+							]
+						];
+
+						$pmhandler->set_data($pm);
+
+						if ($pmhandler->validate_pm()) {
+							$pmhandler->insert_pm();
+						}
+
+					}
+					else if ($emails[$uid]) {
+
+						$mailqueue[] = [
+							"mailto" => $db->escape_string($emails[$uid]),
+							"mailfrom" => '',
+							"subject" => $db->escape_string($title),
+							"message" => $db->escape_string($message),
+							"headers" => ''
+						];
+
+						$update_mailqueue = true;
+
+					}
+
+				}
+
+				if ($mailqueue) {
+					$db->insert_query_multiple("mailqueue", $mailqueue);
+				}
+
+				if ($update_mailqueue) {
+					$GLOBALS['cache']->update_mailqueue();
+				}
+
+			}
+
+		}
 
 		return $this->log([
 			'type' => 'executed',
