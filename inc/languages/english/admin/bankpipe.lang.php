@@ -189,6 +189,8 @@ $l['bankpipe_discounts_text_items_singular'] = 'item';
 $l['bankpipe_discounts_no_restrictions'] = 'No restrictions';
 $l['bankpipe_manage_discount'] = 'Manage discount code';
 $l['bankpipe_manage_discount_editing'] = 'Manage discount code - {1}';
+$l['bankpipe_manage_discount_name'] = 'Name';
+$l['bankpipe_manage_discount_name_desc'] = 'Enter the name of this coupon. It will be shown to the user when it will be redeemed.';
 $l['bankpipe_manage_discount_code'] = 'Code';
 $l['bankpipe_manage_discount_code_desc'] = 'Enter the code your users will be able to enter to receive the corresponding reduction. Infinite alphanumeric characters can be entered. [<a href="" id="random">Generate random</a>]';
 $l['bankpipe_manage_discount_value'] = 'Value';

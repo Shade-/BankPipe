@@ -47,7 +47,7 @@ $sub_tabs['discounts'] = [
 ];
 
 if ($mybb->input['action'] == 'manage_subscription') {
-	
+
 	$sub_tabs['subscriptions'] = [
 		'title' => $lang->bankpipe_subscriptions,
 		'link' => MAINURL . '&amp;action=manage_subscription',
@@ -288,27 +288,27 @@ else if ($mybb->input['action'] == 'logs') {
 		LIMIT ' . (int) $start . ', ' . (int) $perpage . '
 	');
 	while ($log = $db->fetch_array($query)) {
-		
+
 		$log['bids'] = explode('|', $log['bids']);
 		if ($log['bids']) {
 			$search = array_merge($search, $log['bids']);
 		}
-		
+
 		$logs[] = $log;
-		
+
 	}
-	
+
 	if ($search) {
 		$search = array_filter(array_unique($search));
 	}
-	
+
 	// Cache items
 	$items = [];
 	$query = $db->simple_select('bankpipe_items', 'name, bid', "bid IN ('" . implode("','", $search) . "')");
 	while ($item = $db->fetch_array($query)) {
 		$items[$item['bid']] = $item['name'];
 	}
-	
+
 	// Loop through logs and display them
 	foreach ($logs as $log) {
 
@@ -357,32 +357,32 @@ else if ($mybb->input['action'] == 'logs') {
 		if (!is_array($log['bids'])) {
 			$log['bids'] = [$log['bids']];
 		}
-		
+
 		foreach ($log['bids'] as $bid) {
-			
+
 			$item .= '<li>';
-			
+
 			$name = $items[$bid];
-			
+
 			if ($name) {
-	
+
 				if ($log['pid']) {
 					$item .= "<a href='" . MAINURL . "&amp;action=edit_purchase&amp;pid=" . $log['pid'] . "'>" . htmlspecialchars_uni($name) . "</a>";
 				}
 				else {
 					$item .= htmlspecialchars_uni($name);
 				}
-	
+
 			}
 
 			if ($log['price']) {
 				$item .= ', ' . $log['price'] . ' ' . $mybb->settings['bankpipe_currency'];
 			}
-			
+
 			$item .= '</li>';
-		
+
 		}
-		
+
 		$item .= '</ul>';
 
 		$table->construct_cell($item);
@@ -434,7 +434,7 @@ else if ($mybb->input['action'] == 'downloadlogs') {
 	$page->output_header($lang->bankpipe_downloadlogs);
 
 	$page->output_nav_tabs($sub_tabs, 'downloadlogs');
-	
+
 	// Sorting
 	$form = new Form(MAINURL . "&amp;action=downloadlogs&amp;sort=true", "post", "downloadlogs");
 	$form_container = new FormContainer();
@@ -455,7 +455,7 @@ else if ($mybb->input['action'] == 'downloadlogs') {
 
 	$form_container->end();
 	$form->end();
-	
+
 	$where = [];
 	if ($mybb->input['sort']) {
 
@@ -506,7 +506,7 @@ else if ($mybb->input['action'] == 'downloadlogs') {
 	else {
 		$mybb->input['page'] = 1;
 	}
-	
+
 	$query = $db->query('
 		SELECT COUNT(l.lid) AS num_results
 		FROM ' . TABLE_PREFIX . 'bankpipe_downloadlogs l
@@ -603,7 +603,7 @@ else if ($mybb->input['action'] == 'downloadlogs') {
 		$form->end();
 
 	}
-	
+
 	echo <<<HTML
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/datepicker/0.6.5/datepicker.min.css" type="text/css" />
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/datepicker/0.6.5/datepicker.min.js"></script>
@@ -1420,7 +1420,7 @@ else if ($mybb->input['action'] == 'manage_discount') {
 	}
 
 	if ($mybb->request_method == 'post') {
-		
+
 		$mybb->input['expires'] = get_formatted_date($mybb->input['expires']);
 
 		$data = [
@@ -1431,7 +1431,8 @@ else if ($mybb->input['action'] == 'manage_discount') {
 			'stackable' => (int) $mybb->input['stackable'],
 			'gids' => implode(',', (array) $mybb->input['gids']),
 			'bids' => (string) $mybb->input['bids'],
-			'uids' => (string) $mybb->input['uids']
+			'uids' => (string) $mybb->input['uids'],
+			'name' => (string) $mybb->input['name']
 		];
 
 		if ($mybb->input['delete']) {
@@ -1439,9 +1440,9 @@ else if ($mybb->input['action'] == 'manage_discount') {
 			$db->delete_query('bankpipe_discounts', "did IN ('" . implode("','", (array) $mybb->input['delete']) . "')");
 		}
 		else {
-		
+
 			$error = false;
-			
+
 			// Duplicate code check
 			if (!$did and $db->fetch_field(
 					$db->simple_select('bankpipe_discounts', 'did', "code = '" . $db->escape_string($mybb->input['code']) . "'"),
@@ -1466,9 +1467,9 @@ else if ($mybb->input['action'] == 'manage_discount') {
 				$message = $lang->bankpipe_success_discount_edited;
 				$db->update_query('bankpipe_discounts', $data, "did = '" . $discount['did'] . "'");
 			}
-		
+
 		}
-	
+
 		// Redirect
 		if (!$error) {
 			flash_message($message, 'success');
@@ -1483,15 +1484,15 @@ else if ($mybb->input['action'] == 'manage_discount') {
 		foreach ($discount as $field => $value) {
 			$mybb->input[$field] = $value;
 		}
-	
+
 		if (!is_array($mybb->input['gids'])) {
 			$mybb->input['gids'] = explode(',', $mybb->input['gids']);
 		}
-		
+
 		if ($mybb->input['bids']) {
-			
+
 			$selectBids = [];
-			
+
 			$query = $db->simple_select('bankpipe_items', 'bid, name', 'bid IN (' . $db->escape_string($mybb->input['bids']) . ')');
 			while ($item = $db->fetch_array($query)) {
 				$selectBids[] = [
@@ -1499,15 +1500,15 @@ else if ($mybb->input['action'] == 'manage_discount') {
 					'text' => $item['name']
 				];
 			}
-			
+
 			$selectBids = json_encode($selectBids);
-			
+
 		}
-		
+
 		if ($mybb->input['uids']) {
-			
+
 			$selectUids = [];
-			
+
 			$query = $db->simple_select('users', 'username, uid', 'uid IN (' . $db->escape_string($mybb->input['uids']) . ')');
 			while ($user = $db->fetch_array($query)) {
 				$selectUids[] = [
@@ -1515,9 +1516,9 @@ else if ($mybb->input['action'] == 'manage_discount') {
 					'text' => $user['username']
 				];
 			}
-			
+
 			$selectUids = json_encode($selectUids);
-			
+
 		}
 
 	}
@@ -1536,6 +1537,12 @@ else if ($mybb->input['action'] == 'manage_discount') {
 	$form = new Form(MAINURL . "&amp;action=manage_discount" . $extraAction, "post", "manage_discount");
 
 	$form_container = new FormContainer($title);
+
+	// Name
+	$form_container->output_row($lang->bankpipe_manage_discount_name, $lang->bankpipe_manage_discount_name_desc, $form->generate_text_box('name', $mybb->input['name'], [
+		'id' => 'name',
+		'style' => '" autocomplete="off'
+	]), 'name');
 
 	// Code
 	$form_container->output_row($lang->bankpipe_manage_discount_code, $lang->bankpipe_manage_discount_code_desc, $form->generate_text_box('code', $mybb->input['code'], [
@@ -1613,13 +1620,13 @@ var expiry = $("#expires").datepicker({
 
 // Random code generator
 $('#random').on('click', (e) => {
-	
+
 	e.preventDefault();
-	
+
 	var random = Math.random().toString(36).toUpperCase().substr(2, 18);
-	
+
 	$('#code').val(random);
-	
+
 });
 // Get items autocomplete
 $("#bids").select2({
@@ -1691,49 +1698,51 @@ else if ($mybb->input['action'] == 'discounts') {
 	if ($db->num_rows($query) > 0) {
 
 		while ($discount = $db->fetch_array($query)) {
+
+			// Name/code
+			$name = ($discount['name']) ? $discount['name'] : $discount['code'];
 			
-			// Name
-			$table->construct_cell("<a href='" . MAINURL . "&amp;action=manage_discount&amp;did={$discount['did']}'>{$discount['code']}</a>");
-			
+			$table->construct_cell("<a href='" . MAINURL . "&amp;action=manage_discount&amp;did={$discount['did']}'>{$name}</a>");
+
 			// Value
 			$value = '-' . $discount['value'];
-			
+
 			$value .= ($discount['type'] == 1) ? '%' : ' ' . $mybb->settings['bankpipe_currency'];
 			$table->construct_cell($value, ['style' => 'text-align: center']);
-			
+
 			// Permissions
 			$arr = [
 				'users' => $discount['uids'],
 				'usergroups' => $discount['gids'],
 				'items' => $discount['bids']
 			];
-			
+
 			$text = [];
 			foreach ($arr as $t => $v) {
-				
+
 				if ($v) {
-					
+
 					$v = count(explode(',', $v));
-				
+
 					$tempString = ($v == 1) ? 'bankpipe_discounts_text_' . $t . '_singular' :  'bankpipe_discounts_text_' . $t;
-					
+
 					$text[] = $v . ' ' . $lang->$tempString;
-					
+
 				}
-				
+
 			}
 			$text = implode(', ', $text);
-			
+
 			if (!$text) {
 				$text = $lang->bankpipe_discounts_no_restrictions;
 			}
-			
+
 			$table->construct_cell($text, ['style' => 'text-align: center']);
-			
+
 			// Expiry date
 			$expiryDate = ($discount['expires']) ? my_date('relative', $discount['expires']) : $lang->bankpipe_discounts_expires_never;
 			$table->construct_cell($expiryDate, ['style' => 'text-align: center']);
-			
+
 			// Delete
 			$table->construct_cell($form->generate_check_box("delete[]", $discount['did']), ['style' => 'text-align: center']);
 			$table->construct_row();

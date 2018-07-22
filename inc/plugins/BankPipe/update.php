@@ -137,7 +137,7 @@ email=Email",
 			if (!$db->table_exists('bankpipe_discounts')) {
 
 				$collation = $db->build_create_table_collation();
-		
+
 				$db->write_query("
 				CREATE TABLE " . TABLE_PREFIX . "bankpipe_discounts (
 					did int(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -152,15 +152,15 @@ email=Email",
 					stackable tinyint(1) NOT NULL DEFAULT '0'
 		        ) ENGINE=MyISAM{$collation};
 				");
-		
+
 			}
 
 			if (!$db->field_exists('country', 'bankpipe_payments')) {
 				$db->add_column('bankpipe_payments', 'country', 'varchar(8) NOT NULL DEFAULT \'\' AFTER `payer_id`');
 			}
-			
-			if ($db->field_exists('bid', 'bankpipe_logs')) {
-				$db->rename_column('bankpipe_logs', 'bid', 'bids', 'text');
+
+			if ($db->field_exists('bid', 'bankpipe_log')) {
+				$db->rename_column('bankpipe_log', 'bid', 'bids', 'text');
 			}
 
 			$new_settings[] = [
@@ -182,8 +182,17 @@ email=Email",
 				"disporder" => 14,
 				"gid" => $gid
 			];
-			
+
 			$updateTemplates = 1;
+
+		}
+
+		// beta 4
+		if (version_compare($this->old_version, 'beta 4', "<")) {
+
+			if (!$db->field_exists('name', 'bankpipe_discounts')) {
+				$db->add_column('bankpipe_discounts', 'name', 'varchar(128) DEFAULT NULL AFTER `gids`');
+			}
 
 		}
 
