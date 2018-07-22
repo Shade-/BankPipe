@@ -1,0 +1,13 @@
+<tr>
+	<td class="trow1" colspan="3">
+		<form action="usercp.php" method="post" style="text-align: center">
+			<input type="text" class="textbox" style="width: 400px" name="code" placeholder="{$lang->bankpipe_discounts_promo_code}" value="" />
+			<input type="submit" class="button" value="{$lang->bankpipe_discounts_apply}" />
+			<input type="hidden" name="my_post_key" value="{$mybb->post_code}" />
+			<input type="hidden" name="action" value="bankpipe-discounts" />
+			<input type="hidden" name="discount" value="1" />
+			<input type="hidden" name="return-to" value="{$mybb->input['action']}" />
+		</form>
+	</td>
+</tr>
+{$appliedDiscounts}

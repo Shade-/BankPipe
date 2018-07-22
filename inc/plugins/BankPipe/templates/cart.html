@@ -1,0 +1,39 @@
+<html>
+	<head>
+		<title>{$lang->bankpipe_cart_title}</title>
+		{$headerinclude}
+	</head>
+	<body>
+		{$header}
+		<table width="100%" border="0" align="center">
+			<tr>
+				{$usercpnav}
+				<td valign="top">
+					{$errors}
+					<table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder">
+						<thead>
+							<tr>
+								<td class="thead" colspan="3"><strong>{$lang->bankpipe_cart_title}</strong></td>
+							</tr>
+							{$discountArea}
+							<tr>
+								<td class="tcat">{$lang->bankpipe_cart_header_attachment}</td>
+								<td class="tcat" align="center">{$lang->bankpipe_cart_header_cost}</td>
+								<td class="tcat" align="center">{$lang->bankpipe_cart_header_discount}</td>
+							</tr>
+						</thead>
+						<tbody>
+							{$items}
+							{$total}
+						</tbody>
+					</table>
+					<div style="text-align: center; margin: 20px 0">
+						<a href="#" class="purchase"></a>
+					</div>
+				</td>
+			</tr>
+		</table>
+		{$script}
+		{$footer}
+	</body>
+</html>

@@ -1,0 +1,13 @@
+<tr>
+	<td class="trow1">
+		{$discount['code']}
+	</td>
+	<td class="trow1" align="center">
+		– {$discount['value']}{$discount['suffix']}
+	</td>
+	<td class="trow1" align="center">
+		<a href="{$mybb->settings['bburl']}/usercp.php?action=bankpipe-discounts&amp;delete=1&amp;did={$discount['did']}&amp;my_post_key={$mybb->post_code}&amp;return-to={$mybb->input['action']}">
+			{$lang->bankpipe_discounts_remove_code}
+		</a>
+	</td>
+</tr>

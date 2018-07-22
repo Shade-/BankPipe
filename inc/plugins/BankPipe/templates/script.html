@@ -4,6 +4,7 @@
 
 		var CREATE_PAYMENT_URL  = '{$mybb->settings['bburl']}/bankpipe.php?action=create-payment';
 		var EXECUTE_PAYMENT_URL = '{$mybb->settings['bburl']}/bankpipe.php?action=execute-payment';
+		var REQUIRED_FIELDS = '{$mybb->settings['bankpipe_required_fields']}'.split(',');
 
 		$('.purchase').each((key, item) => {
 
@@ -24,10 +25,38 @@
 				},
 
 				payment: () => {
-					return paypal.request.post(CREATE_PAYMENT_URL, {
-						item: $(item).data('bid')
-					}).then((data) => {
-						return data.id;
+					
+					var send = {};
+					
+					item = $(item);
+					if (item.data('bid')) {
+						send['item'] = item.data('bid');
+					}
+					else {
+						send['fromCookies'] = true;
+					}
+					
+					if (REQUIRED_FIELDS.length) {
+						$.each(REQUIRED_FIELDS, (k, v) => {
+							
+							var input = $('input[name="' + v + '"]');
+							var val = input.val();
+							
+							if (input.is('input:checkbox:checked, input:radio:checked') || (val && !input.is('input:checkbox, input:radio'))) {
+								send[v] = val;
+							}
+							
+						});
+					}
+					
+					return paypal.request.post(CREATE_PAYMENT_URL, send).then((response) => {
+						
+						if (response.error) {
+							return $.jGrowl(response.error, {theme: 'jgrowl_error'});
+						}
+						
+						return response.id;
+						
 					});
 				},
 
@@ -54,6 +83,56 @@
 				},
 
 			}, '#' + id);
+
+		});
+		
+		// Cart routines
+		var cartNav = $('.cart .counter');
+		var itemsInCart = Cookies.get('bankpipe-items');
+		itemsInCart = (typeof itemsInCart !== 'undefined') ? JSON.parse(itemsInCart) : [];
+		var itemsCount = itemsInCart.length;
+
+		$('.bankpipe-item').on('click', function(e) {
+
+			e.preventDefault();
+
+			var btn = $(this);
+
+			var send = {
+				data: {
+					ajax: 1
+				},
+				complete: (xhr, status) => {
+					
+					var response = $.parseJSON(xhr.responseText);
+					
+					if (response.error) {
+						$.jGrowl(response.error, {'theme': 'jgrowl_error'});
+					}
+					else if (response.message) {
+						
+						var addClass = 'addToCart';
+						var removeClass = 'removeFromCart';
+						
+						if (response.action == 'add') {
+							itemsCount++;
+							btn.text('{$lang->bankpipe_remove_from_cart}').removeClass(addClass).addClass(removeClass).attr('href', btn.attr('href').replace('add=1', 'remove=1'));
+						}
+						else {
+							itemsCount--;
+							btn.text('{$lang->bankpipe_add_to_cart}').removeClass(removeClass).addClass(addClass).attr('href', btn.attr('href').replace('remove=1', 'add=1'));
+						}
+						
+						cartNav.text(itemsCount);
+						
+						$.jGrowl(response.message, {theme: 'jgrowl_success'});
+
+					}
+					
+				}
+			};
+
+			$.ajax(btn.attr('href'), send);
 
 		});
 	});

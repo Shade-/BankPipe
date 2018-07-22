@@ -39,24 +39,19 @@ class BankPipe
 		}
 	}
 
-	public function createPayment($item = [])
+	public function createPayment($items = [])
 	{
-		global $mybb, $db;
+		global $mybb, $db, $lang;
 
-		$payee = ($item['payee']) ? $item['payee'] : $mybb->settings['bankpipe_subscription_payee'];
+		$payee = ($items['payee']) ? $items['payee'] : $mybb->settings['bankpipe_subscription_payee'];
+		$currency = $items['currency'];
 
-		$input = [
+		$custom = [
 			'uid' => (int) $mybb->user['uid'],
-			'bid' => (int) $item['bid'],
 			'payee' => $payee
 		];
-
-		if (!$input['bid']) {
-			return $this->error($item);
-		}
-
-		$input = base64_encode(serialize($input));
-
+		
+		// The final data sent to PayPal
 		$data = [
 	        "intent" => "sale",
 	        "redirect_urls" => [
@@ -67,80 +62,153 @@ class BankPipe
 	            "payment_method" => "paypal"
 	        ],
 	        "transactions" => [
-	            [
+		        [
 	                "amount" => [
-	                    "total" => $item['price'],
-	                    "currency" => $item['currency']
+	                    "total" => 0,
+	                    "currency" => $currency
 	                ],
 					"invoice_number" => uniqid(),
 					"payee" => [
 						"email" => $payee,
 					],
 					"item_list" => [
-						"items" => [
-							[
-								"name" => $item['name'],
-								"price" => $item['price'],
-								"currency" => $item['currency'],
-								"quantity" => 1
-							]
-						]
-					],
-					"custom" => $input
-	            ]
+						"items" => []
+					]
+				]
 	        ]
 	    ];
+	    
+	    $finalItems = $bids = $appliedDiscounts = [];
+	    
+	    // Loop through all the items
+	    foreach ((array) $items['customs'] as $item) {
+		    
+		    $itemData = [
+				"name" => $item['name'],
+				"price" => $item['price'],
+				"currency" => $currency,
+				"quantity" => 1,
+				"sku" => $item['bid']
+			];
+	
+		    if ($item['description']) {
+			    $itemData['description'] = $item['description'];
+		    }
+		    
+		    $finalItems[] = $itemData;
+		    $finalPrice = $item['price'];
 
-		// Apply discount
-		$item['discount'] = (int) $item['discount'];
-
-		if ($item['discount'] > 0) {
-
-			// Search for the highest previous subscription of this user
-			$query = $db->query('
-				SELECT MAX(i.price) AS price, p.payment_id
-				FROM ' . TABLE_PREFIX . 'bankpipe_items i
-				LEFT JOIN ' . TABLE_PREFIX . 'bankpipe_payments p ON (p.uid = ' . (int) $mybb->user['uid'] . ' AND p.bid = i.bid AND p.active = 1)
-				WHERE i.gid <> 0 AND p.payment_id IS NOT NULL AND i.bid <> ' . (int) $item['bid'] . '
-				LIMIT 1
-			');
-			$oldSubscription = $db->fetch_array($query);
-
-			// If found, calculate discount relative to that
-			if ($oldSubscription['price']) {
-				$price = ($item['price'] - ($oldSubscription['price'] * $item['discount'] / 100));
-			}
-			// Not found, apply discount relative to the current price
-			else {
-
-				$rate = ($item['discount'] > 100) ? 100 : $item['discount'];
-				$price = $item['price'] - ($item['price'] * $rate / 100);
-
-				if ($price <= 0) {
-					$price = $item['price'];
+			// Apply discounts
+			// Previous subscriptions
+			$item['discount'] = (int) $item['discount'];
+	
+			if ($item['discount'] > 0) {
+	
+				// Search for the highest previous subscription of this user
+				$query = $db->query('
+					SELECT MAX(i.price) AS price, p.payment_id
+					FROM ' . TABLE_PREFIX . 'bankpipe_items i
+					LEFT JOIN ' . TABLE_PREFIX . 'bankpipe_payments p ON (p.uid = ' . (int) $mybb->user['uid'] . ' AND p.bid = i.bid AND p.active = 1)
+					WHERE i.gid <> 0 AND p.payment_id IS NOT NULL AND i.bid <> ' . (int) $item['bid'] . '
+					LIMIT 1
+				');
+				$oldSubscription = $db->fetch_array($query);
+	
+				// If found, calculate relative discount
+				if ($oldSubscription['price']) {
+					$price = ($item['price'] - ($oldSubscription['price'] * $item['discount'] / 100));
 				}
-
+				// Not found, apply discount relative to the current price
+				else {
+	
+					$rate = ($item['discount'] > 100) ? 100 : $item['discount'];
+					$price = $item['price'] - ($item['price'] * $rate / 100);
+	
+				}
+				
+				$price = ($price > 0) ? $price : 0;
+	
+				if ($price != $finalPrice) {
+					
+					// Set new price
+					$finalPrice = $price;
+		
+					// Add discount
+					$finalItems[] = [
+						'name' => $lang->bankpipe_discount_previous_item,
+						'description' => $lang->bankpipe_discount_previous_item_desc,
+						'price' => ($price - $item['price']),
+						'currency' => $currency,
+						'quantity' => 1,
+						'sku' => $item['bid']
+					];
+	
+				}
+	
 			}
-
-			$data['transactions'][0]['amount']['total'] = $price;
-
-			if ($price != $item['price']) {
-
-				// Add Discount item
-				$data['transactions'][0]['item_list']['items'][] = [
-					'name' => 'Discount',
-					'price' => ($price - $item['price']),
-					'currency' => $item['currency'],
-					'quantity' => 1
-				];
-
+			
+			// Promo codes
+			$existingDiscounts = bankpipe_read_cookie('discounts');
+			
+			if ($existingDiscounts and ($mybb->settings['bankpipe_cart_mode'] or $item['gid'])) {
+				
+				$search = implode(',', array_map('intval', $existingDiscounts));
+					
+				$query = $db->simple_select('bankpipe_discounts', 'value, code, type, bids, gids, uids', 'did IN (' . $search . ')');
+				while ($discount = $db->fetch_array($query)) {
+					
+					if (!bankpipe_check_discount_permissions($discount, $item)) {
+						continue;
+					}
+					
+					// Finally apply the discount
+					// Percentage
+					if ($discount['type'] == 1) {
+						$price = $finalPrice - ($finalPrice * $discount['value'] / 100);
+					}
+					// Absolute
+					else {
+						$price = $finalPrice - $discount['value'];
+					}
+					
+					$price = ($price > 0) ? $price : 0;
+					
+					if ($price != $finalPrice) {
+		
+						// Add discount
+						$finalItems[] = [
+							'name' => $discount['code'],
+							'description' => $lang->bankpipe_discount_code_desc,
+							'price' => ($price - $finalPrice),
+							'currency' => $currency,
+							'quantity' => 1,
+							'sku' => $item['bid']
+						];
+	
+						// Set new price
+						$finalPrice = $price;
+						
+					}
+					
+					$appliedDiscounts[] = $discount['code'];
+					
+				}
+				
 			}
-
+			
+			$bids[] = $item['bid'];
+			$data['transactions'][0]['amount']['total'] += $finalPrice; // Add this item to the total
+		   
 		}
-
-	    if ($item['description']) {
-		    $data['transactions'][0]['item_list']['items'][0]['description'] = $item['description'];
-	    }
+		
+		if ($finalItems) {
+			$data['transactions'][0]['item_list']['items'] = $finalItems;
+		}
+		else {
+			// Error? No items?
+		}
+		
+		$data['transactions'][0]['custom'] = base64_encode(serialize($custom));
 
 		$payment = new \PayPal\Api\Payment($data);
 
@@ -155,11 +223,17 @@ class BankPipe
 		if ($payment->getState() == 'failed') {
 			return $this->error($payment->getFailureReason());
 		}
-
-		$this->log([
+		
+		$log = [
 			'type' => 'created',
-			'bid' => (int) $item['bid']
-		]);
+			'bids' => implode('|', array_unique($bids))
+		];
+		
+		if ($appliedDiscounts) {
+			$log['message'] = $lang->sprintf($lang->bankpipe_discounts_applied, implode(', ', array_unique($appliedDiscounts)));
+		}
+
+		$this->log($log);
 
 		return $payment;
 	}
@@ -187,17 +261,24 @@ class BankPipe
 		if ($payment->getState() == 'failed') {
 			return $this->error($payment->getFailureReason());
 		}
+		
+		$transaction = $payment->getTransactions()[0];
 
-		$state = $payment->getTransactions()[0]->getRelatedResources()[0]->getSale()->state;
+		$state = $transaction->getRelatedResources()[0]->getSale()->state;
 		if ($state != 'completed') {
 
 			if ($state == 'pending') {
 
-				$input = unserialize(base64_decode($payment->getTransactions()[0]->custom));
+				$input = unserialize(base64_decode($transaction->custom));
+				
+				$bids = [];
+				foreach ((array) $transaction->item_list->getItems() as $item) {
+					$bids[] = $item->getSku();
+				}
 
 				$this->log([
 					'type' => 'pending',
-					'bid' => (int) $input['bid'],
+					'bids' => implode('|', array_unique($bids)),
 					'uid' => (int) $input['uid']
 				]);
 
@@ -224,71 +305,135 @@ class BankPipe
 	{
 		global $mybb, $db, $lang;
 
-		$transactions = $payment->getTransactions();
-		$sale = $transactions[0]->getRelatedResources()[0]->getSale();
+		$transaction = $payment->getTransactions()[0];
+		$sale = $transaction->getRelatedResources()[0]->getSale();
 
-		$input = unserialize(base64_decode($transactions[0]->custom));
+		$input = unserialize(base64_decode($transaction->custom));
+		$buyer = (int) $input['uid'];
 
 		$query = $db->simple_select('users', 'uid', "payee = '" . $db->escape_string($input['payee']) . "'");
 		$payee = (int) $db->fetch_field($query, 'uid');
+		
+		$totalPrice = $sku = 0;
+		
+		// Loop through each purchased item
+		foreach ((array) $transaction->item_list->getItems() as $purchasedItem) {
+			
+			$sku = (int) $purchasedItem->getSku();
+			
+			$bids[] = $sku;
+			
+			$totalPrice += $purchasedItem->getPrice();
 
-		// Add payment log
-		$data = [
-			'bid' => (int) $input['bid'],
-			'uid' => (int) $input['uid'],
-			'payment_id' => $db->escape_string($payment->id),
-			'sale' => $db->escape_string($sale->getId()),
-			'email' => $db->escape_string($payment->payer->payer_info->email),
-			'payer_id' => $db->escape_string($payment->payer->payer_info->payer_id),
-			'payee' => $payee,
-			'invoice' => $db->escape_string($transactions[0]->invoice_number),
-			'date' => TIME_NOW,
-			'price' => $transactions[0]->amount->total
-		];
+			// Add payment log
+			// First time loop – the real item
+			if (!$data[$sku]) {
 
-		// Get purchased item data
-		$query = $db->simple_select('bankpipe_items', '*', "bid = '" . (int) $input['bid'] . "'", ['limit' => 1]);
-		$item = $db->fetch_array($query);
-
-		// Expiry date
-		if ($item['expires']) {
-			$data['expires'] = (int) (TIME_NOW + (60*60*24*$item['expires']));
-		}
-
-		// Change usergroup
-		if ($item['gid']) {
-
-			if ($item['primarygroup']) {
-				$update = [
-					'usergroup' => (int) $item['gid'],
-					'displaygroup' => (int) $item['gid']
+				$data[$sku] = [
+					'bid' => $sku,
+					'uid' => $buyer,
+					'payment_id' => $db->escape_string($payment->id),
+					'sale' => $db->escape_string($sale->getId()),
+					'email' => $db->escape_string($payment->payer->payer_info->email),
+					'payer_id' => $db->escape_string($payment->payer->payer_info->payer_id),
+					'country' => $db->escape_string($payment->payer->payer_info->country_code), // Fixes https://www.mybboost.com/thread-storing-buyer-s-country-in-database
+					'payee' => $payee,
+					'invoice' => $db->escape_string($transaction->invoice_number),
+					'date' => TIME_NOW,
+					'price' => $purchasedItem->getPrice()
 				];
+			
 			}
+			// N-time loop – discounts
 			else {
-
-				$additionalGroups = (array) explode(',', $mybb->user['additionalgroups']);
-
-				// Check if the new gid is already present and eventually add it
-				if (!in_array($item['gid'], $additionalGroups)) {
-					$additionalGroups[] = $item['gid'];
-				}
-
-				$update = [
-					'additionalgroups' => implode(',', $additionalGroups)
-				];
-
+				
+				$data[$sku]['price'] += $purchasedItem->getPrice();
+				$data[$sku]['discounts'][] = $purchasedItem->getName();
+				
 			}
-
-			$db->update_query('users', $update, "uid = '" . $data['uid'] . "'");
-
-			// Add new and old gid to this payment
-			$data['oldgid'] = ($item['expirygid']) ? (int) $item['expirygid'] : (int) $mybb->user['usergroup'];
-			$data['newgid'] = (int) $item['gid'];
-
+		
 		}
-
-		$db->insert_query('bankpipe_payments', $data);
-		$pid = $db->insert_id();
+		
+		$search = implode("','", array_map('intval', array_unique($bids)));
+		
+		$query = $db->simple_select('bankpipe_items', '*', "bid IN ('" . $search . "')");
+		while($item = $db->fetch_array($query)) {
+			$items[$item['bid']] = $item;
+		}
+		
+		$itemNames = [];
+		
+		// Insert in db
+		foreach ($data as $bid => $insert) {
+			
+			// Final retouches
+			$item = $items[$bid];
+	
+			// Expiry date
+			if ($item['expires']) {
+				$insert['expires'] = (int) (TIME_NOW + (60*60*24*$item['expires']));
+			}
+			
+			// Add name to the array of names – used for notifications
+			$itemNames[] = $item['name'];
+	
+			// Change usergroup
+			if ($item['gid']) {
+	
+				if ($item['primarygroup']) {
+					$update = [
+						'usergroup' => (int) $item['gid'],
+						'displaygroup' => (int) $item['gid']
+					];
+				}
+				else {
+	
+					$additionalGroups = (array) explode(',', $mybb->user['additionalgroups']);
+	
+					// Check if the new gid is already present and eventually add it
+					if (!in_array($item['gid'], $additionalGroups)) {
+						$additionalGroups[] = $item['gid'];
+					}
+	
+					$update = [
+						'additionalgroups' => implode(',', $additionalGroups)
+					];
+	
+				}
+	
+				$db->update_query('users', $update, "uid = '" . $buyer . "'");
+	
+				// Add new and old gid to this payment
+				$insert['oldgid'] = ($item['expirygid']) ? (int) $item['expirygid'] : (int) $mybb->user['usergroup'];
+				$insert['newgid'] = (int) $item['gid'];
+	
+			}
+			
+			if ($insert['discounts']) {
+				
+				$discounts = $insert['discounts'];
+				unset($insert['discounts']);
+				
+			}
+	
+			// Insert in the db and log
+			$db->insert_query('bankpipe_payments', $insert);
+			$pid = $db->insert_id();
+			
+			$log = [
+				'type' => 'executed',
+				'bids' => $insert['bid'],
+				'uid' => $insert['uid'],
+				'pid' => (int) $pid
+			];
+			
+			if ($discounts) {
+				$log['message'] = $lang->sprintf($lang->bankpipe_discounts_applied, implode(', ', $discounts));
+			}
+			
+			$this->log($log);
+		
+		}
 
 		// If enabled, send out a reminder to a specified list of admins
 		if ($mybb->settings['bankpipe_admin_notification'] or $payee['uid']) {
@@ -306,38 +451,35 @@ class BankPipe
 
 			if (count($uids) > 0) {
 
-				$mailqueue = $emails = $ugroups = [];
+				$mailqueue = $emails = [];
 
-				$query = $db->simple_select('users', 'uid, username', 'uid = ' . $data['uid'], ['limit' => 1]);
+				$query = $db->simple_select('users', 'uid, username', 'uid = ' . (int) $input['uid'], ['limit' => 1]);
 				$buyer = $db->fetch_array($query);
-
-				$query = $db->simple_select('usergroups', 'gid, title', "gid IN ('{$data['oldgid']}', '{$data['newgid']}')");
-				while ($ugroup = $db->fetch_array($query)) {
-					$ugroups[$ugroup['gid']] = $ugroup['title'];
-				}
 
 				// Prepare the message
 				$buyer['link'] = $mybb->settings['bburl'] . '/' . get_profile_link($buyer['uid']);
 
-				$moved = ($data['oldgid'] != $data['newgid']) ? $lang->sprintf($lang->bankpipe_notification_purchase_moved, $ugroups[$data['oldgid']], $ugroups[$data['newgid']]) : '';
+				$names = '[*]' . implode("\n[*]", $itemNames);
 
-				require_once MYBB_ROOT."inc/class_parser.php";
-				$parser = new postParser;
-				$parserOptions = [
-					'allow_mycode' => 1,
-					'allow_imgcode' => 1,
-					'allow_videocode' => 1,
-					'allow_smilies' => 1,
-					'filter_badwords' => 1
-				];
-
-				$title = $lang->sprintf($lang->bankpipe_notification_purchase_title, $buyer['username'], $item['name'], $data['price'] . $mybb->settings['bankpipe_currency']);
-				$message = $lang->sprintf($lang->bankpipe_notification_purchase, $buyer['username'], $buyer['link'], $item['name'], $data['price'] . $mybb->settings['bankpipe_currency'], $moved, $mybb->settings['bbname']);
-				$message = $parser->parse_message($message, $parserOptions);
-
-				// Cache user emails
+				$title = $lang->sprintf($lang->bankpipe_notification_purchase_title, $buyer['username'], $totalPrice . $mybb->settings['bankpipe_currency']);
+				$message = $lang->sprintf($lang->bankpipe_notification_purchase, $buyer['username'], $buyer['link'], $names, $totalPrice . $mybb->settings['bankpipe_currency'], $mybb->settings['bbname']);
+				
+				// Parse for emails
 				if ($mybb->settings['bankpipe_admin_notification_method'] != 'pm') {
-
+					
+					require_once MYBB_ROOT."inc/class_parser.php";
+					$parser = new postParser;
+					$parserOptions = [
+						'allow_mycode' => 1,
+						'allow_imgcode' => 1,
+						'allow_videocode' => 1,
+						'allow_smilies' => 1,
+						'filter_badwords' => 1
+					];
+					
+					$message = $parser->parse_message($message, $parserOptions);
+					
+					// Cache user emails
 					$query = $db->simple_select('users', 'uid, email', 'uid IN (' . implode(',', $uids) . ')');
 					while ($user = $db->fetch_array($query)) {
 
@@ -402,12 +544,7 @@ class BankPipe
 
 		}
 
-		return $this->log([
-			'type' => 'executed',
-			'bid' => $data['bid'],
-			'uid' => $data['uid'],
-			'pid' => (int) $pid
-		]);
+		return true;
 	}
 
 	public function getPaymentDetails($paymentId)

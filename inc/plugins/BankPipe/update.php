@@ -79,7 +79,7 @@ class BankPipe_Update
 		$gid   = (int) $db->fetch_field($query, "gid");
 
 		// beta 2
-		if (version_compare($this->old_version, '1.2', "<")) {
+		if (version_compare($this->old_version, 'beta 2', "<")) {
 
 			$new_settings[] = [
 				"name" => "bankpipe_admin_notification",
@@ -115,6 +115,78 @@ email=Email",
 
 		}
 
+		// beta 3
+		if (version_compare($this->old_version, 'beta 3', "<")) {
+
+			if (!$db->table_exists('bankpipe_downloadlogs')) {
+
+				$collation = $db->build_create_table_collation();
+
+				$db->write_query("
+				CREATE TABLE " . TABLE_PREFIX . "bankpipe_downloadlogs (
+					lid int(8) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+					pid int(10) NOT NULL DEFAULT '0',
+					uid int(10) NOT NULL DEFAULT '0',
+					aid int(10) NOT NULL DEFAULT '0',
+					title text,
+					date int(10) NOT NULL DEFAULT '0'
+		        ) ENGINE=MyISAM{$collation};
+				");
+
+			}
+			if (!$db->table_exists('bankpipe_discounts')) {
+
+				$collation = $db->build_create_table_collation();
+		
+				$db->write_query("
+				CREATE TABLE " . TABLE_PREFIX . "bankpipe_discounts (
+					did int(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+					bids text,
+					uids text,
+					gids text,
+					code text,
+					value int(10) NOT NULL DEFAULT '0',
+					type tinyint(1) NOT NULL DEFAULT '0',
+					date int(10) NOT NULL DEFAULT '0',
+					expires int(10) UNSIGNED NOT NULL DEFAULT '0',
+					stackable tinyint(1) NOT NULL DEFAULT '0'
+		        ) ENGINE=MyISAM{$collation};
+				");
+		
+			}
+
+			if (!$db->field_exists('country', 'bankpipe_payments')) {
+				$db->add_column('bankpipe_payments', 'country', 'varchar(8) NOT NULL DEFAULT \'\' AFTER `payer_id`');
+			}
+			
+			if ($db->field_exists('bid', 'bankpipe_logs')) {
+				$db->rename_column('bankpipe_logs', 'bid', 'bids', 'text');
+			}
+
+			$new_settings[] = [
+				"name" => "bankpipe_cart_mode",
+				"title" => $db->escape_string($lang->setting_bankpipe_cart_mode),
+				"description" => $db->escape_string($lang->setting_bankpipe_cart_mode_desc),
+				"optionscode" => "yesno",
+				"value" => 1,
+				"disporder" => 13,
+				"gid" => $gid
+			];
+
+			$new_settings[] = [
+				"name" => "bankpipe_required_fields",
+				"title" => $db->escape_string($lang->setting_bankpipe_required_fields),
+				"description" => $db->escape_string($lang->setting_bankpipe_required_fields_desc),
+				"optionscode" => "text",
+				"value" => '',
+				"disporder" => 14,
+				"gid" => $gid
+			];
+			
+			$updateTemplates = 1;
+
+		}
+
 		if ($new_settings) {
 			$db->insert_query_multiple('settings', $new_settings);
 		}
@@ -138,7 +210,7 @@ email=Email",
 				}
 			}
 
-			$PL->templates('bankpipe', 'bankpipe', $templates);
+			$PL->templates('bankpipe', 'BankPipe', $templates);
 
 		}
 
