@@ -173,9 +173,7 @@ if ($mybb->input['action'] == 'manage_subscription') {
 	]), 'price');
 
 	// Subscription usergroup
-	$subusergroups = [
-		$lang->bankpipe_manage_subscription_use_default_usergroup
-	];
+	$subusergroups = [];
 
 	$groups_cache = $cache->read('usergroups');
 	unset($groups_cache[1]); // 1 = guests. Exclude them
@@ -1792,7 +1790,7 @@ else if (!$mybb->input['action']) {
 	}
 
 	if ($db->num_rows($query) == 0) {
-		$table->construct_cell($lang->bankpipe_subscriptions_no_subscription, ['colspan' => 2]);
+		$table->construct_cell($lang->bankpipe_subscriptions_no_subscription, ['colspan' => 3]);
 		$table->construct_row();
 	}
 
