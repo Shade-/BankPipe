@@ -340,6 +340,8 @@ function bankpipe_uninstall()
 	$db->drop_table('bankpipe_notifications');
 	$db->drop_table('bankpipe_items');
 	$db->drop_table('bankpipe_payments');
+	$db->drop_table('bankpipe_downloadlogs');
+	$db->drop_table('bankpipe_discounts');
 
 	if ($db->field_exists('payee', 'users')) {
 		$db->drop_column('users', 'payee');
