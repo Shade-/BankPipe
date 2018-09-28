@@ -105,6 +105,7 @@ if ($mybb->input['action'] == 'manage_subscription') {
 			'price' => $price,
 			'uid' => (int) $mybb->settings['bankpipe_subscription_payee'],
 			'gid' => (int) $mybb->input['gid'],
+			'email' => $db->escape_string($mybb->input['email']),
 			'discount' => (int) $mybb->input['discount'],
 			'expires' => (int) $mybb->input['expires'],
 			'primarygroup' => (int) $mybb->input['primarygroup'],
@@ -163,6 +164,11 @@ if ($mybb->input['action'] == 'manage_subscription') {
 		'id' => 'description',
 		'maxlength' => 127
 	]), 'description');
+
+	$form_container->output_row($lang->bankpipe_manage_subscription_email, $lang->bankpipe_manage_subscription_email_desc, $form->generate_text_box('email', $mybb->input['email'], [
+		'id' => 'email',
+		'style' => '" autocomplete="off" placeholder="Default: ' . $mybb->settings['bankpipe_subscription_payee']
+	]), 'email');
 
 	$form_container->output_row($lang->bankpipe_manage_subscription_htmldescription, $lang->bankpipe_manage_subscription_htmldescription_desc, $form->generate_text_area('htmldescription', $mybb->input['htmldescription'], [
 		'id' => 'htmldescription'
@@ -1699,7 +1705,7 @@ else if ($mybb->input['action'] == 'discounts') {
 
 			// Name/code
 			$name = ($discount['name']) ? $discount['name'] : $discount['code'];
-			
+
 			$table->construct_cell("<a href='" . MAINURL . "&amp;action=manage_discount&amp;did={$discount['did']}'>{$name}</a>");
 
 			// Value

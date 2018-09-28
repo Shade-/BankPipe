@@ -196,6 +196,17 @@ email=Email",
 
 		}
 
+		// beta 5
+		if (version_compare($this->old_version, 'beta 5', "<")) {
+
+			if (!$db->field_exists('email', 'bankpipe_items')) {
+				$db->add_column('bankpipe_items', 'email', 'TEXT AFTER `aid`');
+			}
+
+			$updateTemplates = 1;
+
+		}
+
 		if ($new_settings) {
 			$db->insert_query_multiple('settings', $new_settings);
 		}

@@ -73,9 +73,9 @@
 							$.jGrowl(response.error, {theme: 'jgrowl_error'});
 						}
 						
-						if (response.reload && response.success) {
+						if (response.reload && response.data) {
 							setTimeout(() => {
-								location.reload();
+								location.href = response.data.redirect;
 							}, 1000*response.reload);
 						}
 						

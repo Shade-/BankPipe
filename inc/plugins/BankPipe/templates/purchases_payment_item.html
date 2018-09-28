@@ -1,0 +1,18 @@
+<tr>
+	<td class="trow1">
+		<a href="attachment.php?aid={$item['aid']}" target="_blank">{$item['name']}</a>
+		<div class="smalltext">{$item['size']}</div>
+	</td>
+	<td class="trow1" align="center" width="100">{$lang->bankpipe_purchases_payment_date}</td>
+	<td class="trow1" align="center" width="200">{$item['date']}</td>
+</tr>
+<tr>
+	<td class="trow2"></td>
+	<td class="trow2" align="center">{$lang->bankpipe_purchases_payment_sold_by}</td>
+	<td class="trow2" align="center">{$seller}</td>
+</tr>
+<tr>
+	<td class="trow1"></td>
+	<td class="trow1" align="center">{$lang->bankpipe_purchases_payment_cost}</td>
+	<td class="trow1" align="center">{$item['realprice']}{$lang->bankpipe_currency}</td>
+</tr>

@@ -54,6 +54,8 @@ $l['bankpipe_manage_subscription_name'] = $l['bankpipe_subscriptions_name'] = 'N
 $l['bankpipe_manage_subscription_name_desc'] = 'The name of this subscription. It will be displayed to the user when purchasing this subscription.';
 $l['bankpipe_manage_subscription_description'] = 'PayPal description';
 $l['bankpipe_manage_subscription_description_desc'] = 'This description will be displayed to the user when purchasing this subscription on PayPal. You can add up to 127 characters, HTML is not supported.';
+$l['bankpipe_manage_subscription_email'] = 'PayPal custom email';
+$l['bankpipe_manage_subscription_email_desc'] = 'Enter a custom PayPal email (payee) to send the money to when users purchase this subscription. If set, this will override the default payee set in BankPipe\'s settings.';
 $l['bankpipe_manage_subscription_htmldescription'] = 'Forum description';
 $l['bankpipe_manage_subscription_htmldescription_desc'] = 'The extended description will be displayed in the forum. You can add HTML and an unlimited amount of characters.';
 $l['bankpipe_manage_subscription_price'] = $l['bankpipe_subscriptions_price'] = 'Price';

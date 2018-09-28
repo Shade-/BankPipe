@@ -32,7 +32,9 @@ if ($mybb->input['action'] == 'create-payment') {
 	// Get items from cookies if using cart mode
 	if ($mybb->settings['bankpipe_cart_mode'] and $mybb->input['fromCookies'] and $mybb->cookies['bankpipe-items']) {
 
-		$existingItems = ($mybb->cookies['bankpipe-items']) ? array_filter((array) json_decode($mybb->cookies['bankpipe-items'])) : [];
+		$existingItems = ($mybb->cookies['bankpipe-items'])
+			? array_filter((array) json_decode($mybb->cookies['bankpipe-items']))
+			: [];
 		$existingItems = array_map('intval', $existingItems);
 
 		$items = bankpipe_get_paid_attachments($existingItems);
@@ -60,6 +62,11 @@ if ($mybb->input['action'] == 'create-payment') {
 		$query = $db->simple_select('users', 'payee', 'uid = ' . (int) $first['uid']);
 		$email = $db->fetch_field($query, 'payee');
 
+		// Is there a PayPal email override set?
+		if ($first['email']) {
+			$email = $first['email'];
+		}
+
 		// Build the array to send
 		$send = [
 			'customs' => $items,
@@ -72,8 +79,25 @@ if ($mybb->input['action'] == 'create-payment') {
 		if (is_array($payment)) {
 			$PayPal->send($payment);
 		}
+		// Success
 		else {
+
+			if ($requiredFields) {
+
+				if (!session_id()) {
+					session_start();
+				}
+
+				$_SESSION['BankPipe'] = [];
+
+				foreach ($requiredFields as $field) {
+					$_SESSION['BankPipe'][$field] = $mybb->input[$field];
+				}
+
+			}
+
 			$PayPal->send(['id' => $payment->getId()]);
+
 		}
 
 	}
@@ -99,8 +123,14 @@ if ($mybb->input['action'] == 'execute-payment') {
 			my_unsetcookie('bankpipe-discounts');
 		}
 
-		// TO-DO: replace with purchase recap
-		$PayPal->send(['success' => $lang->sprintf($lang->bankpipe_success_purchased_item, $response['transactions'][0]['item_list']['items'][0]['name']), 'data' => $response, 'reload' => 3]);
+		$PayPal->send([
+			'success' => $lang->sprintf(
+				$lang->bankpipe_success_purchased_item,
+				$response['transactions'][0]['item_list']['items'][0]['name']
+			),
+			'data' => $response,
+			'reload' => 3
+		]);
 
 	}
 	else {

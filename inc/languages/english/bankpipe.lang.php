@@ -36,6 +36,12 @@ $l['bankpipe_purchases_title'] = "Purchases";
 $l['bankpipe_purchases_no_purchases'] = "You haven't purchased any attachment at the moment. To purchase an attachment, press the Pay Now button alongside paid attachments.";
 $l['bankpipe_purchases_expired'] = "Expired";
 $l['bankpipe_purchases_refunded'] = "Refunded";
+$l['bankpipe_purchases_sale_info'] = "Sale info";
+$l['bankpipe_purchases_payment_total'] = "Total paid: ";
+$l['bankpipe_purchases_payment_date'] = "Date";
+$l['bankpipe_purchases_payment_sold_by'] = "Sold by";
+$l['bankpipe_purchases_payment_cost'] = "Cost";
+$l['bankpipe_purchases_payment_transaction'] = "Transaction: ";
 
 // Cart
 $l['bankpipe_cart_title'] = "Cart";
@@ -90,7 +96,7 @@ $l['bankpipe_error_other_codes_not_allowed_stackable'] = "This promo code cannot
 $l['bankpipe_error_code_already_applied'] = "This promo code has already been applied.";
 $l['bankpipe_error_missing_required_field'] = "Some required fields are missing. Please ensure you have filled all the required fields before trying to purchase an item.";
 
-$l['bankpipe_success_purchased_item'] = "You have successfully purchased {1}. If the page is not reloaded automatically, please reload it manually.";
+$l['bankpipe_success_purchased_item'] = "You have successfully purchased {1}. You will be redirected to the purchase recap in some seconds.";
 $l['bankpipe_success_settings_edited'] = "Settings edited";
 $l['bankpipe_success_settings_edited_desc'] = "Your items management settings have been edited successfully.";
 

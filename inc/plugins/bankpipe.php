@@ -7,7 +7,7 @@
  * @package BankPipe
  * @license Copyrighted ©
  * @author  Shade <shad3-@outlook.com>
- * @version beta 4
+ * @version beta 5
  */
 
 if (!defined('IN_MYBB')) {
@@ -39,7 +39,7 @@ function bankpipe_info()
 	        $description = "<br><br>Core edits missing. <a href='{$apply}'>Apply core edits.</a>";
 		}
 		else {
-			$apply = $PL->url_append('index.php',
+			$revert = $PL->url_append('index.php',
 				[
 					'module' => 'config-plugins',
 					'bankpipe' => 'revert',
@@ -56,7 +56,7 @@ function bankpipe_info()
 		'description'   =>  'A fully functional payment system for MyBB.' . $description,
 		'website'       =>  'https://www.mybboost.com/forum-bankpipe',
 		'author'        =>  'Shade',
-		'version'       =>  'beta 4',
+		'version'       =>  'beta 5',
 		'compatibility' =>  '18*',
 	];
 }
@@ -189,6 +189,7 @@ email=Email",
 			price decimal(6,2) NOT NULL,
 			gid int(10) NOT NULL DEFAULT '0',
 			aid int(10) NOT NULL DEFAULT '0',
+			email TEXT,
 			name varchar(128) DEFAULT NULL,
 			description varchar(128) DEFAULT NULL,
 			htmldescription text,
@@ -440,7 +441,7 @@ function bankpipe_plugin_edit()
 
 function bankpipe_apply_attachment_edits($apply = false)
 {
-	global $PL;
+	global $PL, $mybb;
 
 	$PL or require_once PLUGINLIBRARY;
 
@@ -466,9 +467,7 @@ function bankpipe_apply_attachment_edits($apply = false)
 	$edits = [
 		[
 			'search' => 'if($forumpermissions[\'canview\'] == 0 || $forumpermissions[\'canviewthreads\'] == 0 || (isset($forumpermissions[\'canonlyviewownthreads\']) && $forumpermissions[\'canonlyviewownthreads\'] != 0 && $thread[\'uid\'] != $mybb->user[\'uid\']) || ($forumpermissions[\'candlattachments\'] == 0 && !$mybb->input[\'thumbnail\']))',
-			'replace' => [
-				'if($forumpermissions[\'canview\'] == 0 || $forumpermissions[\'canviewthreads\'] == 0 || (isset($forumpermissions[\'canonlyviewownthreads\']) && $forumpermissions[\'canonlyviewownthreads\'] != 0 && $thread[\'uid\'] != $mybb->user[\'uid\']) || ($forumpermissions[\'candlattachments\'] == 0 && !$mybb->input[\'thumbnail\'] && !$mybb->input[\'skip\']))'
-			]
+			'replace' => 'if($forumpermissions[\'canview\'] == 0 || $forumpermissions[\'canviewthreads\'] == 0 || (isset($forumpermissions[\'canonlyviewownthreads\']) && $forumpermissions[\'canonlyviewownthreads\'] != 0 && $thread[\'uid\'] != $mybb->user[\'uid\']) || ($forumpermissions[\'candlattachments\'] == 0 && !$mybb->input[\'thumbnail\'] && !$mybb->input[\'skip\']))'
 		]
 	];
 
@@ -476,6 +475,36 @@ function bankpipe_apply_attachment_edits($apply = false)
 
 	if ($result !== true) {
 		$errors[] = $result;
+	}
+
+	// Core edit is necessary for MyBB 1.8.19+
+	if ($mybb->version_code > 1818) {
+
+		$edits = [
+			[
+				'search' => [
+					'if(!empty($attachedfile[\'error\']))',
+					'{',
+						'$ret[\'errors\'][] = $attachedfile[\'error\'];',
+						'$mybb->input[\'action\'] = $action;',
+					'}'
+				],
+				'after' => [
+					'else',
+					'{',
+						'$args = [\'attachedfile\' => $attachedfile];',
+						'$GLOBALS[\'plugins\']->run_hooks(\'bankpipe_core_add_attachment\', $args);',
+					'}'
+				]
+			]
+		];
+
+		$result = $PL->edit_core('bankpipe', 'inc/functions_upload.php', $edits, $apply);
+
+		if ($result !== true) {
+			$errors[] = $result;
+		}
+
 	}
 
 	if (count($errors) >= 1) {
@@ -493,6 +522,7 @@ function bankpipe_revert_attachment_edits($apply = false)
 	$PL or require_once PLUGINLIBRARY;
 
 	$PL->edit_core('bankpipe', 'inc/functions_post.php', [], $apply);
+	$PL->edit_core('bankpipe', 'inc/functions_upload.php', [], $apply);
 	return $PL->edit_core('bankpipe', 'attachment.php', [], $apply);
 }
 
@@ -512,6 +542,10 @@ if ($mybb->settings['bankpipe_client_id'] and $mybb->settings['bankpipe_client_s
 	$plugins->add_hook('editpost_action_start', 'bankpipe_edit_attachments');
 	$plugins->add_hook('newthread_start', 'bankpipe_edit_attachments');
 	$plugins->add_hook('newreply_start', 'bankpipe_edit_attachments');
+
+	if ($mybb->version_code > 1818) {
+		$plugins->add_hook('bankpipe_core_add_attachment', 'bankpipe_update_paid_attachment');
+	}
 
 	$plugins->add_hook('editpost_do_editpost_start', 'bankpipe_save_paid_item');
 	$plugins->add_hook('newreply_do_newreply_start', 'bankpipe_save_paid_item');
@@ -888,9 +922,9 @@ function bankpipe_panel()
 
 		$highestPurchased = $subs = $purchases = [];
 
-		$query = $db->simple_select('bankpipe_payments', 'bid', 'active = 1 AND uid = ' . (int) $mybb->user['uid']);
-		while ($pid = $db->fetch_field($query, 'bid')) {
-			$purchases[$pid] = true;
+		$query = $db->simple_select('bankpipe_payments', 'bid, payment_id', 'active = 1 AND uid = ' . (int) $mybb->user['uid']);
+		while ($purchase = $db->fetch_array($query)) {
+			$purchases[$purchase['bid']] = $purchase['payment_id'];
 		}
 
 		$query = $db->simple_select('bankpipe_items', '*', 'gid <> 0', ['order_by' => 'price ASC']);
@@ -970,7 +1004,10 @@ function bankpipe_panel()
 
 				// Bought or not?
 				if ($purchases[$subscription['bid']] and $highestPurchased['bid'] == $subscription['bid']) {
+
+					$paymentId = $purchases[$subscription['bid']];
 					eval("\$subscriptions .= \"".$templates->get("bankpipe_subscriptions_subscription_purchased")."\";");
+
 				}
 				else {
 					eval("\$subscriptions .= \"".$templates->get("bankpipe_subscriptions_subscription")."\";");
@@ -1204,11 +1241,42 @@ function bankpipe_panel()
 
 	if ($mybb->input['action'] == 'bankpipe-purchases') {
 
+		// Informations
+		$paymentId = $mybb->input['sale']; // Sanitized in bankpipe_get_payments()
+
+		if ($paymentId) {
+
+			$payments = bankpipe_get_payment($paymentId);
+
+			if ($payments) {
+
+				$items = '';
+				$total = 0;
+
+				foreach ($payments as $item) {
+
+					$total += $item['realprice'];
+
+					$user = get_user($item['uid']);
+					$seller = format_name($user['username'], $user['usergroup'], $user['displaygroup']);
+					$seller = build_profile_link($seller, $user['uid']);
+
+					eval("\$items .= \"".$templates->get("bankpipe_purchases_payment_item")."\";");
+
+				}
+
+				eval("\$page = \"".$templates->get("bankpipe_purchases_payment")."\";");
+				output_page($page);
+
+			}
+
+		}
+
 		add_breadcrumb($lang->bankpipe_nav_purchases);
 
-		$_purchases = bankpipe_get_user_purchased_attachments($mybb->user['uid']);
-
 		$purchases = $inactive = $refunded = $expired = '';
+
+		$_purchases = bankpipe_get_user_purchased_attachments($mybb->user['uid']);
 
 		if ($_purchases) {
 
@@ -1383,8 +1451,12 @@ function bankpipe_edit_attachments()
 
 			if ($attach) {
 
+				// Get name of attachment, and also update that
+				$query = $db->simple_select('attachments', 'filename', 'aid = ' . (int) $attachedfile['aid']);
+				$filename = $db->fetch_field($query, 'filename');
+
 				// Update this item aid using the new attachment in order to retain purchases over this item
-				$db->update_query('bankpipe_items', ['aid' => (int) $attachedfile['aid']], 'bid = ' . (int) $attach['bid']);
+				$db->update_query('bankpipe_items', ['aid' => (int) $attachedfile['aid'], 'name' => $db->escape_string($filename)], 'bid = ' . (int) $attach['bid']);
 
 				// Remove the old attachment
 				remove_attachment($pid, "", $update);
@@ -1428,6 +1500,42 @@ function bankpipe_edit_attachments()
 
 		}
 	');
+}
+
+function bankpipe_update_paid_attachment($args)
+{
+	global $templates, $db, $mybb, $fid, $pid;
+
+	if (!bankpipe_check_permissions('', $fid) or !$mybb->user['payee']) {
+		return false;
+	}
+
+	$attachedfile = (array) $args['attachedfile'];
+
+	if (!empty($mybb->input['paidattachs']['update']) and $attachedfile['aid']) {
+
+		$update = (int) $mybb->input['paidattachs']['update'];
+
+		if ($update > 0 and $update != $attachedfile['aid']) {
+
+			// Get this attachment
+			$attach = bankpipe_get_paid_attachments($update);
+
+			if ($attach) {
+
+				// Get name of attachment, and also update that
+				$query = $db->simple_select('attachments', 'filename', 'aid = ' . (int) $attachedfile['aid']);
+				$filename = $db->fetch_field($query, 'filename');
+
+				// Update this item aid using the new attachment in order to retain purchases over this item
+				$db->update_query('bankpipe_items', ['aid' => (int) $attachedfile['aid'], 'name' => $db->escape_string($filename)], 'bid = ' . (int) $attach['bid']);
+
+				// Remove the old attachment
+				remove_attachment($pid, "", $update);
+			}
+
+		}
+	}
 }
 
 function bankpipe_attachment_options()
@@ -1739,6 +1847,52 @@ function bankpipe_get_user_purchased_attachments($uid = 0)
 		LEFT JOIN ' . TABLE_PREFIX . 'attachments a ON (i.aid = a.aid)
 		LEFT JOIN ' . TABLE_PREFIX . 'posts po ON (a.pid = po.pid)
 		WHERE i.gid = 0 AND p.uid = ' . $uid . '
+		ORDER BY p.date DESC
+	');
+
+	if ($db->num_rows($query) > 0) {
+
+		while ($purchase = $db->fetch_array($query)) {
+
+			$purchase['subject'] = htmlspecialchars_uni($purchase['subject']);
+
+			$purchase['size'] = get_friendly_size($purchase['filesize']);
+			$purchase['icon'] = get_attachment_icon(get_extension($purchase['filename']));
+			$purchase['filename'] = htmlspecialchars_uni($purchase['filename']);
+
+			$purchase['date'] = my_date('relative', $purchase['date']);
+
+			$purchase['price'] += 0;
+			$purchase['realprice'] += 0;
+
+			$purchases[$purchase['bid']] = $purchase;
+
+		}
+
+	}
+
+	return $purchases;
+}
+
+function bankpipe_get_payment($id = '')
+{
+	global $mybb, $db;
+
+	if (!$id) {
+		return false;
+	}
+
+	$id = $db->escape_string($id);
+
+	$purchases = [];
+
+	$query = $db->query('
+		SELECT i.*, p.price as realprice, p.uid AS payeruid, p.payment_id, p.date, p.refund, p.expires, p.active, a.*, po.subject
+		FROM ' . TABLE_PREFIX . 'bankpipe_payments p
+		LEFT JOIN ' . TABLE_PREFIX . 'bankpipe_items i ON (p.bid = i.bid)
+		LEFT JOIN ' . TABLE_PREFIX . 'attachments a ON (i.aid = a.aid)
+		LEFT JOIN ' . TABLE_PREFIX . 'posts po ON (a.pid = po.pid)
+		WHERE p.payment_id = \'' . $id . '\'
 		ORDER BY p.date DESC
 	');
 

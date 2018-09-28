@@ -96,7 +96,7 @@ class BankPipe
 		    }
 
 		    $finalItems[] = $itemData;
-		    $finalPrice = $item['price'];
+		    $finalPrice = $price = $item['price'];
 
 			// Apply discounts
 			// Previous subscriptions
@@ -117,13 +117,6 @@ class BankPipe
 				// If found, calculate relative discount
 				if ($oldSubscription['price']) {
 					$price = ($item['price'] - ($oldSubscription['price'] * $item['discount'] / 100));
-				}
-				// Not found, apply discount relative to the current price
-				else {
-
-					$rate = ($item['discount'] > 100) ? 100 : $item['discount'];
-					$price = $item['price'] - ($item['price'] * $rate / 100);
-
 				}
 
 				$price = ($price > 0) ? $price : 0;
@@ -294,11 +287,13 @@ class BankPipe
 		// Finally process the payment by inserting it into the db and do what needs to be done
 		$result = $this->processExecutedPayment($payment);
 
-		if ($result['error']) {
+		if (isset($result['error'])) {
 			return $result;
 		}
 
-	    return $payment->toArray();
+	    return array_merge($payment->toArray(), [
+	    	'redirect' => $mybb->settings['bburl'] . '/usercp.php?action=bankpipe-purchases&sale=' . $result
+	    ]);
 	}
 
 	public function processExecutedPayment($payment)
@@ -316,6 +311,8 @@ class BankPipe
 
 		$totalPrice = $sku = 0;
 
+		$paymentId = $payment->id;
+
 		// Loop through each purchased item
 		foreach ((array) $transaction->item_list->getItems() as $purchasedItem) {
 
@@ -332,7 +329,7 @@ class BankPipe
 				$data[$sku] = [
 					'bid' => $sku,
 					'uid' => $buyer,
-					'payment_id' => $db->escape_string($payment->id),
+					'payment_id' => $db->escape_string($paymentId),
 					'sale' => $db->escape_string($sale->getId()),
 					'email' => $db->escape_string($payment->payer->payer_info->email),
 					'payer_id' => $db->escape_string($payment->payer->payer_info->payer_id),
@@ -464,6 +461,30 @@ class BankPipe
 				$title = $lang->sprintf($lang->bankpipe_notification_purchase_title, $buyer['username'], $totalPrice . $mybb->settings['bankpipe_currency']);
 				$message = $lang->sprintf($lang->bankpipe_notification_purchase, $buyer['username'], $buyer['link'], $names, $totalPrice . $mybb->settings['bankpipe_currency'], $mybb->settings['bbname']);
 
+				// Custom fields? Find and replace those fuckers
+				if (!session_id()) {
+					session_start();
+				}
+
+				$find = $replace = [];
+
+				if ($_SESSION['BankPipe']) {
+
+					foreach ($_SESSION['BankPipe'] as $key => $field) {
+
+						$find[] = '{' . strtoupper($key) . '}';
+						$replace[] = $field;
+
+					}
+
+					unset($_SESSION['BankPipe']);
+
+				}
+
+				if ($find and $replace) {
+					$message = str_replace($find, $replace, $message);
+				}
+
 				// Parse for emails
 				if ($mybb->settings['bankpipe_admin_notification_method'] != 'pm') {
 
@@ -490,15 +511,18 @@ class BankPipe
 					}
 
 				}
+				else {
+
+					require_once MYBB_ROOT . "inc/datahandlers/pm.php";
+					$pmhandler                 = new PMDataHandler();
+					$pmhandler->admin_override = true;
+
+				}
 
 				// Send notification
 				foreach ($uids as $uid) {
 
 					if ($mybb->settings['bankpipe_admin_notification_method'] == 'pm') {
-
-						require_once MYBB_ROOT . "inc/datahandlers/pm.php";
-						$pmhandler                 = new PMDataHandler();
-						$pmhandler->admin_override = true;
 
 						$pm = [
 							"subject" => $title,
@@ -544,7 +568,8 @@ class BankPipe
 
 		}
 
-		return true;
+		// Return payment id to redirect
+		return $paymentId;
 	}
 
 	public function getPaymentDetails($paymentId)
@@ -602,7 +627,7 @@ class BankPipe
 
 		$this->log([
 			'type' => 'refund',
-			'bid' => (int) $transaction['bid'],
+			'bids' => (int) $transaction['bid'],
 			'pid' => (int) $transaction['pid']
 		]);
 
