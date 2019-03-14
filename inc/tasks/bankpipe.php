@@ -46,7 +46,7 @@ function task_bankpipe($task)
 	$query = $db->simple_select('bankpipe_payments', '*', 'active = 1 AND expires > 0' . $where, ['order_by' => 'expires ASC']);
 	while ($subscription = $db->fetch_array($query)) {
 
-		$subscriptions[$subscription['pid']] = $subscription;
+		$subscriptions[] = $subscription;
 		$uids[] = $subscription['uid'];
 
 	}
@@ -56,13 +56,13 @@ function task_bankpipe($task)
 		// Get associated items
 		$items = $emails = $users = [];
 
-		$query = $db->simple_select('bankpipe_items', 'name, primarygroup, price, bid', 'bid IN (' . implode(',', array_keys($subscriptions)) . ')');
+		$query = $db->simple_select('bankpipe_items', 'name, primarygroup, price, bid', 'bid IN (' . implode(',', array_column($subscriptions, 'bid')) . ')');
 		while($item = $db->fetch_array($query)) {
 			$items[$item['bid']] = $item;
 		}
 
 		// Get users usernames
-		$query = $db->simple_select('users', 'uid, username, usergroup, additionalgroups, email', 'uid IN (' . implode(',', $uids) . ')');
+		$query = $db->simple_select('users', 'uid, username, usergroup, additionalgroups, email, displaygroup', 'uid IN (' . implode(',', $uids) . ')');
 		while($user = $db->fetch_array($query)) {
 			$users[$user['uid']] = $user;
 		}
@@ -81,10 +81,16 @@ function task_bankpipe($task)
 				if ($oldGroup) {
 
 					if ($items[$subscription['bid']]['primarygroup']) {
+						
 						$data = [
-							'usergroup' => $oldGroup,
-							'displaygroup' => $oldGroup
+							'usergroup' => $oldGroup
 						];
+						
+						// Change display group only if set differently from "use primary"
+						if ($users[$subscription['uid']]['displaygroup'] != 0) {
+							$data['displaygroup'] = 0;
+						}
+						
 					}
 					else {
 
@@ -160,8 +166,9 @@ function task_bankpipe($task)
 
 				if ($notification['method'] == 'pm') {
 
-					// Make sure admins haven't done something bad
-					$fromid = ($mybb->settings['bankpipe_notification_uid']) ? (int) $mybb->settings['bankpipe_notification_uid'] : -1;
+					$fromid = ($mybb->settings['bankpipe_notification_uid']) ?
+					    (int) $mybb->settings['bankpipe_notification_uid'] :
+					    -1;
 
 					$pm = [
 						"subject" => $title,
@@ -171,10 +178,14 @@ function task_bankpipe($task)
 							$subscription['uid']
 						]
 					];
+					
+					$pm['bcc'] = ($mybb->settings['bankpipe_notification_cc']) ?
+					    explode(',', $mybb->settings['bankpipe_notification_cc']) :
+					    [];
 
 					$pmhandler->set_data($pm);
 
-					// Now let the PM handler do all the hard work
+					// Let the PM handler do all the hard work
 					if ($pmhandler->validate_pm()) {
 						$pmhandler->insert_pm();
 					}

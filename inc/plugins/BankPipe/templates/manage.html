@@ -1,6 +1,6 @@
 <html>
 	<head>
-		<title>{$lang->bankpipe_manage_title}</title>
+		<title>{$this->lang->bankpipe_manage_title}</title>
 		{$headerinclude}
 	</head>
 	<body>
@@ -11,20 +11,20 @@
 				<td valign="top">
 					{$errors}
 					<form action="usercp.php" method="post">
-						<input type="hidden" name="my_post_key" value="{$mybb->post_code}" />
-						<input type="hidden" name="action" value="bankpipe-manage" />
+						<input type="hidden" name="my_post_key" value="{$this->mybb->post_code}" />
+						<input type="hidden" name="action" value="manage" />
 						<table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder">
 							<thead>
 								<tr>
-									<td class="thead" colspan="2"><strong>{$lang->bankpipe_manage_title}</strong></td>
+									<td class="thead" colspan="2"><strong>{$this->lang->bankpipe_manage_title}</strong></td>
 								</tr>
 							</thead>
 							<tbody>
 								<tr>
-									<td class="trow1" style="width: 150px">{$lang->bankpipe_manage_paypal_email}</td>
+									<td class="trow1" style="width: 150px">{$this->lang->bankpipe_manage_paypal_email}</td>
 									<td class="trow1">
 										<input type="text" class="textbox" name="payee" value="{$payee}" />
-										<div class="smalltext">{$lang->bankpipe_manage_paypal_email_desc}</div>
+										<div class="smalltext">{$this->lang->bankpipe_manage_paypal_email_desc}</div>
 									</td>
 								</tr>
 								{$items}
@@ -32,7 +32,7 @@
 						</table>
 						<br />
 						<div align="center">
-							<input type="submit" class="button" name="submit" value="{$lang->bankpipe_manage_settings_save}" />
+							<input type="submit" class="button" name="submit" value="{$this->lang->bankpipe_manage_settings_save}" />
 						</div>
 					</form>
 				</td>

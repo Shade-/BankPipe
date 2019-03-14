@@ -1,6 +1,6 @@
 <html>
 	<head>
-		<title>{$lang->bankpipe_purchases_title}</title>
+		<title>{$this->lang->bankpipe_purchases_title}</title>
 		{$headerinclude}
 	</head>
 	<body>
@@ -12,10 +12,10 @@
 					<table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder">
 						<thead>
 							<tr>
-								<td class="thead" colspan="3"><strong>{$lang->bankpipe_purchases_payment_transaction}{$paymentId}</strong></td>
+								<td class="thead" colspan="3"><strong>{$this->lang->bankpipe_purchases_payment_transaction}{$order['payment_id']}</strong></td>
 							</tr>
 							<tr>
-								<th class="tcat">{$lang->bankpipe_purchases_cat_attachment}</th>
+								<th class="tcat">{$this->lang->bankpipe_purchases_payment_item}</th>
 								<th class="tcat" colspan="2"></th>
 							</tr>
 						</thead>
@@ -26,7 +26,7 @@
 							<tr>
 								<td class="trow2" colspan="2"></td>
 								<td class="trow2" align="center">
-									<b>{$lang->bankpipe_purchases_payment_total}{$total}{$lang->bankpipe_currency}</b>
+									<b>{$this->lang->bankpipe_purchases_payment_total}{$order['total']} {$order['currency']}</b>
 								</td>
 							</tr>
 						</tfoot>

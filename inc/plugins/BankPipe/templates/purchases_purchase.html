@@ -1,10 +1,10 @@
 <tr>
 	<td class="trow1">
-		{$purchase['icon']} <a href="attachment.php?aid={$purchase['aid']}" target="_blank">{$purchase['filename']}</a>
-		<div class="smalltext">{$purchase['size']} – <a href="usercp.php?action=bankpipe-purchases&sale={$purchase['payment_id']}">{$lang->bankpipe_purchases_sale_info}</a></div>
+		<a href="usercp.php?action=purchases&invoice={$order['invoice']}" target="_blank">{$order['payment_id']}</a>
+		<div class="smalltext">{$names}</div>
 	</td>
 	<td class="trow1" align="center">
-		{$purchase['realprice']}{$lang->bankpipe_currency}
+		{$order['total']} {$order['currency']}
 	</td>
-	<td class="trow1" align="center">{$purchase['date']}</td>
+	<td class="trow1" align="center">{$order['date']}</td>
 </tr>

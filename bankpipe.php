@@ -2,18 +2,69 @@
 
 define("IN_MYBB", 1);
 
-require_once "./global.php";
-require_once MYBB_ROOT . 'inc/plugins/BankPipe/core.php';
-$PayPal = new BankPipe();
+require_once './global.php';
+include './bankpipe/autoload.php';
+
+use BankPipe\Messages\Handler as Messages;
+use BankPipe\Items\Orders;
+use BankPipe\Core;
+use BankPipe\Logs\Handler as Logs;
+
+$messages = new Messages;
+$orders = new Orders;
+$log = new Logs;
+
+// Initialize gateway
+$defaultGateway = ($mybb->input['gateway']) ? $mybb->input['gateway'] : 'PayPal';
+
+try {
+
+	$className = 'BankPipe\Gateway\\' . $defaultGateway;
+	$gateway = new $className();
+
+}
+catch (Throwable $t) {
+	error($t->getMessage());
+}
 
 $lang->load('bankpipe');
 
-if ($mybb->input['action'] == 'create-payment') {
+$errors = [];
 
-	$errors = [];
-	$requiredFields = array_filter(explode(',', trim($mybb->settings['bankpipe_required_fields'])));
+// User has cancelled the payment
+if ($mybb->input['action'] == 'cancel') {
+	
+	$plugins->run_hooks('bankpipe_cancel');
+	
+	$orders->destroy($mybb->input['orderId']);
+	
+	$log->save([
+        'type' => Orders::CANCEL,
+    	'invoice' => $mybb->input['orderId']
+	]);
+	
+	$messages->display([
+		'cancelled' => true
+	]);
+	
+}
 
-	// Required fields
+if ($mybb->input['action'] == 'webhooks') {
+	
+	$plugins->run_hooks('bankpipe_webhooks');
+	
+	$gateway->webhookListener();
+	
+}
+
+// User wants to pay
+if ($mybb->input['action'] == 'authorize') {
+    
+    $items = [];
+	
+	// Required fields check
+	$requiredFields = Core::normalizeArray(explode(',', $mybb->settings['bankpipe_required_fields']));
+
 	if ($requiredFields) {
 
 		$requiredFields = array_map('trim', $requiredFields);
@@ -28,113 +79,106 @@ if ($mybb->input['action'] == 'create-payment') {
 		}
 
 	}
-
-	// Get items from cookies if using cart mode
+	
+	// Get items to buy from cookies
 	if ($mybb->settings['bankpipe_cart_mode'] and $mybb->input['fromCookies'] and $mybb->cookies['bankpipe-items']) {
 
-		$existingItems = ($mybb->cookies['bankpipe-items'])
+		$aids = ($mybb->cookies['bankpipe-items'])
 			? array_filter((array) json_decode($mybb->cookies['bankpipe-items']))
 			: [];
-		$existingItems = array_map('intval', $existingItems);
 
-		$items = bankpipe_get_paid_attachments($existingItems);
-		if ($items['bid']) {
-			$items = [$items];
-		}
+		$items = $gateway->items->getAttachments($aids);
 
 	}
-	// Get items from input
-	else {
-		$items = bankpipe_get_items([(int) $mybb->get_input('item')]);
+	// Get items to buy from input
+	else if ($mybb->input['items']) {
+    	
+    	$bids = (array) explode(',', $mybb->input['items']);
+    	
+    	if ($bids) {
+		    $items = $gateway->items->getItems($bids);
+        }
+        
 	}
-
-	if ($items['error']) {
-		$errors[] = $items['error'];
+	
+    // No items?
+	if (!$items) {
+		$errors[] = 'No items found';
 	}
+	
+	// Get first item out
+	$first = reset($items);
 
-	// If no errors are found, go ahead by preparing the payment
-	if (!$errors) {
+	// Is there a third party merchant we should send money to?
+	$query = $db->simple_select('users', 'payee', 'uid = ' . (int) $first['uid']);
+	$email = $db->fetch_field($query, 'payee');
 
-		// Get first item out
-		$first = reset($items);
-
-		// Is there a third party payee we should send money to?
-		$query = $db->simple_select('users', 'payee', 'uid = ' . (int) $first['uid']);
-		$email = $db->fetch_field($query, 'payee');
-
-		// Is there a PayPal email override set?
-		if ($first['email']) {
-			$email = $first['email'];
-		}
-
-		// Build the array to send
-		$send = [
-			'customs' => $items,
-			'currency' => $mybb->settings['bankpipe_currency'],
-			'payee' => ($email) ? $email : ''
-		];
-
-		$payment = $PayPal->createPayment($send);
-
-		if (is_array($payment)) {
-			$PayPal->send($payment);
-		}
-		// Success
-		else {
-
-			if ($requiredFields) {
-
-				if (!session_id()) {
-					session_start();
-				}
-
-				$_SESSION['BankPipe'] = [];
-
-				foreach ($requiredFields as $field) {
-					$_SESSION['BankPipe'][$field] = $mybb->input[$field];
-				}
-
-			}
-
-			$PayPal->send(['id' => $payment->getId()]);
-
-		}
-
+	// Is there a merchant email?
+	if ($first['email']) {
+		$email = $first['email'];
 	}
-	else {
-		$PayPal->send(['error' => implode("<br>", $errors)]); // Send errors back
+	
+	if ($email and !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+		$errors[] = 'Merchant email is not valid';
 	}
+	
+	$errors = $plugins->run_hooks('bankpipe_authorize_errors', $errors);
+	
+	// Check errors before authorizing
+	if ($errors) {
+		$messages->error($errors);
+	}
+	
+	$parameters = [
+		'merchant' => $email,
+		'currency' => $mybb->settings['bankpipe_currency']
+	];
+	
+	$args = [&$parameters, &$items];
+    $plugins->run_hooks('bankpipe_authorize_before', $args);
+	
+	// Main call
+	$response = $gateway->purchase($parameters, $items);
+	
+	$response = $plugins->run_hooks('bankpipe_authorize_after', $response);
+
+	// Redirect user to off-site authorization screen
+    if ($response->isRedirect()) {
+        
+        $messages->display([
+	        'url' => $response->getRedirectUrl(),
+	        'data' => $response->getRedirectData(),
+	        'invoice' => $gateway->getOrderId()
+        ]);
+        
+    }
+    else {
+	    $messages->error($response->getMessage());
+    }
 
 }
 
-if ($mybb->input['action'] == 'execute-payment') {
-
-	$response = $PayPal->executePayment();
-
-	if (!$response['error']) {
-
-		// Wipe cart cookies
-		if ($mybb->settings['bankpipe_cart_mode'] and $mybb->cookies['bankpipe-items']) {
-			my_unsetcookie('bankpipe-items');
-		}
-
-		// Wipe discount cookies
-		if ($mybb->cookies['bankpipe-discounts']) {
-			my_unsetcookie('bankpipe-discounts');
-		}
-
-		$PayPal->send([
-			'success' => $lang->sprintf(
-				$lang->bankpipe_success_purchased_item,
-				$response['transactions'][0]['item_list']['items'][0]['name']
-			),
-			'data' => $response,
-			'reload' => 3
-		]);
-
-	}
-	else {
-		$response['reload'] = 8;
-		$PayPal->send($response);
-	}
+// User has approved the payment
+if ($mybb->input['action'] == 'complete') {
+	
+	$response = $gateway->complete([
+		'currency' => $mybb->settings['bankpipe_currency']
+	]);
+	
+	$response = $plugins->run_hooks('bankpipe_complete', $response);
+	
+	// Send success notifications to admins/merchants
+	$gateway->notifications->send();
+    
+    // Display message to user
+    $messages->display([
+    	'reference' => $response['response']->getTransactionReference(),
+    	'message' => $response['response']->getMessage(),
+    	'data' => $response['response']->getData(),
+    	'status' => $response['status'],
+    	'invoice' => $response['invoice']
+    ]);
+	
 }
+    
+exit;

@@ -1,10 +1,10 @@
 <tr>
 	<td class="trow1">
-		{$purchase['icon']} <s>{$purchase['filename']}</s> – {$lang->bankpipe_purchases_refunded}
-		<div class="smalltext">{$purchase['size']}</div>
+		<s><a href="usercp.php?action=purchases&invoice={$order['invoice']}" target="_blank">{$order['payment_id']}</a></s> – {$this->lang->bankpipe_purchases_refunded}
+		<div class="smalltext">{$names}</div>
 	</td>
 	<td class="trow1" align="center">
-		{$purchase['realprice']}{$lang->bankpipe_currency}
+		{$order['total']} {$order['currency']}
 	</td>
-	<td class="trow1" align="center">{$purchase['date']}</td>
+	<td class="trow1" align="center">{$order['date']}</td>
 </tr>

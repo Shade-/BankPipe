@@ -1,10 +1,9 @@
 <tr>
 	<td class="trow1">
 		<a href="attachment.php?aid={$item['aid']}" target="_blank">{$item['name']}</a>
-		<div class="smalltext">{$item['size']}</div>
 	</td>
-	<td class="trow1" align="center" width="100">{$lang->bankpipe_purchases_payment_date}</td>
-	<td class="trow1" align="center" width="200">{$item['date']}</td>
+	<td class="trow1" align="center" width="100"></td>
+	<td class="trow1" align="center" width="200"></td>
 </tr>
 <tr>
 	<td class="trow2"></td>
@@ -14,5 +13,5 @@
 <tr>
 	<td class="trow1"></td>
 	<td class="trow1" align="center">{$lang->bankpipe_purchases_payment_cost}</td>
-	<td class="trow1" align="center">{$item['realprice']}{$lang->bankpipe_currency}</td>
+	<td class="trow1" align="center">{$item['price']} {$order['currency']}</td>
 </tr>
