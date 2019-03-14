@@ -46,7 +46,7 @@ function task_bankpipe($task)
 	$query = $db->simple_select('bankpipe_payments', '*', 'active = 1 AND expires > 0' . $where, ['order_by' => 'expires ASC']);
 	while ($subscription = $db->fetch_array($query)) {
 
-		$subscriptions[$subscription['bid']] = $subscription;
+		$subscriptions[$subscription['pid']] = $subscription;
 		$uids[] = $subscription['uid'];
 
 	}
