@@ -54,7 +54,7 @@ class Update
 		// Get the gid
 		$query = $this->db->simple_select("settinggroups", "gid", "name='bankpipe'");
 		$gid   = (int) $this->db->fetch_field($query, "gid");
-		
+
 		// beta 2
 		if (version_compare($this->oldVersion, 'beta 2', "<")) {
 
@@ -186,7 +186,7 @@ email=Email",
 
 		// beta 6
 		if (version_compare($this->oldVersion, 'beta 6', "<")) {
-		
+
 			$newSettings[] = [
 				"name" => "bankpipe_notification_cc",
 				"title" => $this->db->escape_string($this->lang->setting_bankpipe_notification_cc),
@@ -196,7 +196,7 @@ email=Email",
 				"disporder" => 11,
 				"gid" => $gid
 			];
-		
+
 			$newSettings[] = [
 				"name" => "bankpipe_admin_notification_sender",
 				"title" => $this->db->escape_string($this->lang->setting_bankpipe_admin_notification_sender),
@@ -206,7 +206,7 @@ email=Email",
 				"disporder" => 13,
 				"gid" => $gid
 			];
-		    
+
 		    // Update logs type
 		    $types = [
 		        'created' => Orders::CREATE,
@@ -216,53 +216,61 @@ email=Email",
 		        'pending' => Orders::PENDING
             ];
 		    foreach ($types as $type => $new) {
-    		    
+
     		    $this->db->update_query('bankpipe_log', [
         		    'type' => $new
     		    ], "type = '" . $type . "'");
-    		    
+
 		    }
-		    
+
 			$this->db->modify_column('bankpipe_log', 'type', "tinyint(1) NOT NULL");
-			
+
 			if (!$this->db->field_exists('type', 'bankpipe_items')) {
 				$this->db->add_column('bankpipe_items', 'type', 'tinyint(1) NOT NULL AFTER `expirygid`');
 			}
-			
+
+			if (!$this->db->field_exists('payee_email', 'bankpipe_payments')) {
+				$this->db->add_column('bankpipe_payments', 'payee_email', 'text AFTER `payee`');
+			}
+
 			if (!$this->db->field_exists('fee', 'bankpipe_payments')) {
 				$this->db->add_column('bankpipe_payments', 'fee', 'decimal(6,2) NOT NULL AFTER `active`');
 			}
-			
+
 			if (!$this->db->field_exists('currency', 'bankpipe_payments')) {
 				$this->db->add_column('bankpipe_payments', 'currency', 'varchar(3) NOT NULL AFTER `fee`');
 			}
-			
+
 			if (!$this->db->field_exists('discounts', 'bankpipe_payments')) {
 				$this->db->add_column('bankpipe_payments', 'discounts', 'text AFTER `currency`');
 			}
-			
+
 			if (!$this->db->field_exists('type', 'bankpipe_payments')) {
 				$this->db->add_column('bankpipe_payments', 'type', 'tinyint(1) NOT NULL AFTER `discounts`');
 			}
-		    
+
+			if (!$this->db->field_exists('invoice', 'bankpipe_log')) {
+				$this->db->add_column('bankpipe_log', 'invoice', 'varchar(32) NOT NULL DEFAULT \'\' AFTER `lid`');
+			}
+
 		    // Update items type
 		    $this->db->update_query('bankpipe_items', [
     		    'type' => Items::SUBSCRIPTION
 		    ], "gid <> 0");
-		    
+
 		    $this->db->update_query('bankpipe_items', [
     		    'type' => Items::ATTACHMENT
 		    ], "gid = 0");
-			
+
 			// Update payments type
 		    $this->db->update_query('bankpipe_payments', [
     		    'type' => Orders::SUCCESS
 		    ], "payment_id <> ''");
-			
+
 		    $this->db->update_query('bankpipe_payments', [
     		    'type' => Orders::MANUAL
 		    ], "payment_id = ''");
-			
+
 			// Update payments currency
 		    $this->db->update_query('bankpipe_payments', [
     		    'currency' => $this->mybb->settings['bankpipe_currency']

@@ -11,9 +11,9 @@ class Discounts extends Usercp
 	public function __construct()
 	{
 		$this->traitConstruct();
-		
+
 		global $templates;
-		
+
 		$cookies = new Cookies;
 		$permissions = new Permissions;
 		$messages = new Messages;
@@ -21,7 +21,7 @@ class Discounts extends Usercp
 		$existingDiscounts = $cookies->read('discounts');
 
 		if ($this->mybb->input['add']) {
-    		
+
     		$this->plugins->run_hooks('bankpipe_ucp_discounts_add_start', $this);
 
 			$errors = [];
@@ -63,7 +63,7 @@ class Discounts extends Usercp
 				}
 
 			}
-			
+
 			$args = [&$this, &$errors, &$discount];
     		$this->plugins->run_hooks('bankpipe_ucp_discounts_add_end', $args);
 
@@ -72,29 +72,29 @@ class Discounts extends Usercp
 				$existingDiscounts[] = $discount['did'];
 
 				$cookies->write('discounts', $existingDiscounts);
-				
+
 				$discount['aids'] = [];
-				
+
 				// Look up for the allowed aids
 				if ($discount['bids']) {
-    				
+
 				    $query = $this->db->simple_select('bankpipe_items', 'aid', "bid IN (" . $this->db->escape_string($discount['bids']) . ")");
 				    while ($aid = $this->db->fetch_field($query, 'aid')) {
     				    $discount['aids'][] = $aid;
 				    }
-				
+
 				}
-				    
+
 			    if (!$discount['aids']) {
 				    $discount['aids'] = 'all';
 			    }
-			    
+
 				$discount['suffix'] = ($discount['type'] == 1) ? '%' : ' ' . $this->mybb->settings['bankpipe_currency'];
-				
+
 				$code = ($discount['name']) ? $discount['name'] : $discount['code'];
-			    
+
 			    eval("\$template = \"".$templates->get("bankpipe_discounts_code")."\";");
-				
+
 				$messages->display([
 				    'message' => $this->lang->bankpipe_discount_applied,
 				    'data' => $discount,
@@ -108,7 +108,7 @@ class Discounts extends Usercp
 
 		}
 		else if ($this->mybb->input['delete']) {
-			
+
     		$this->plugins->run_hooks('bankpipe_ucp_discounts_delete', $this);
 
 			$discountId = (int) $this->mybb->input['did'];
@@ -123,7 +123,7 @@ class Discounts extends Usercp
 			else {
 				$cookies->destroy('discounts');
 			}
-			
+
 			$messages->display([
 			    'message' => $this->lang->bankpipe_discounts_removed
 			]);

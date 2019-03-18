@@ -43,6 +43,7 @@ function task_bankpipe($task)
 	$subscriptions = $uids = [];
 
 	// Process expiring subscriptions
+	// TO-DO: use the Orders class
 	$query = $db->simple_select('bankpipe_payments', '*', 'active = 1 AND expires > 0' . $where, ['order_by' => 'expires ASC']);
 	while ($subscription = $db->fetch_array($query)) {
 
@@ -67,7 +68,7 @@ function task_bankpipe($task)
 			$users[$user['uid']] = $user;
 		}
 
-		$update_mailqueue = false;
+		$updateMailqueue = false;
 
 		// Process
 		foreach ($subscriptions as $subscription) {
@@ -81,16 +82,16 @@ function task_bankpipe($task)
 				if ($oldGroup) {
 
 					if ($items[$subscription['bid']]['primarygroup']) {
-						
+
 						$data = [
 							'usergroup' => $oldGroup
 						];
-						
+
 						// Change display group only if set differently from "use primary"
 						if ($users[$subscription['uid']]['displaygroup'] != 0) {
 							$data['displaygroup'] = 0;
 						}
-						
+
 					}
 					else {
 
@@ -178,8 +179,8 @@ function task_bankpipe($task)
 							$subscription['uid']
 						]
 					];
-					
-					$pm['bcc'] = ($mybb->settings['bankpipe_notification_cc']) ?
+
+					$pm['bccid'] = ($mybb->settings['bankpipe_notification_cc']) ?
 					    explode(',', $mybb->settings['bankpipe_notification_cc']) :
 					    [];
 
@@ -201,7 +202,7 @@ function task_bankpipe($task)
 						"headers" => ''
 					];
 
-					$update_mailqueue = true;
+					$updateMailqueue = true;
 
 				}
 
@@ -215,7 +216,7 @@ function task_bankpipe($task)
 			$db->insert_query_multiple("mailqueue", $emails);
 		}
 
-		if ($update_mailqueue) {
+		if ($updateMailqueue) {
 			$cache->update_mailqueue();
 		}
 

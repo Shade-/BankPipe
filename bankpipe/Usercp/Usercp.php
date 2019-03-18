@@ -13,10 +13,10 @@ class Usercp
 		$this->traitConstruct();
 
 		$allowedPages = ['subscriptions', 'cart', 'purchases', 'manage', 'discounts'];
-		
+
 		$args = [&$this, &$allowedPages];
 		$this->plugins->run_hooks('bankpipe_ucp_main', $args);
-		
+
 		$permissions = new Permissions;
 
 		if (in_array($this->mybb->input['action'], $allowedPages) and $permissions->simpleCheck(['view'])) {
@@ -24,12 +24,12 @@ class Usercp
 			$className = 'BankPipe\Usercp\\' . ucfirst($this->mybb->input['action']);
 
 			try {
-    			
+
     			if (!class_exists($className)) {
         			new \BankPipe\Usercp\Subscriptions($this->lang->bankpipe_error_module_not_exists);
         			exit;
     			}
-    			
+
 				new $className;
 			}
 			catch (\Exception $e) {
@@ -37,7 +37,5 @@ class Usercp
 			}
 
 		}
-
 	}
-
 }

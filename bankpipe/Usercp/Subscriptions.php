@@ -49,7 +49,7 @@ class Subscriptions extends Usercp
 			}
 
 		}
-		
+
 		$currency = Core::friendlyCurrency($this->mybb->settings['bankpipe_currency']);
 
 		eval("\$script = \"".$templates->get("bankpipe_script")."\";");

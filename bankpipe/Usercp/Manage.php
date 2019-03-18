@@ -10,15 +10,15 @@ class Manage extends Usercp
 	public function __construct()
 	{
 		$this->traitConstruct();
-		
+
 		global $theme, $templates, $headerinclude, $header, $footer, $usercpnav;
-		
+
 		$permissions = new Permissions;
-		
+
 		if (!$permissions->simpleCheck(['manage'])) {
     		throw new \Exception($this->lang->bankpipe_error_functionality_not_allowed);
 		}
-		
+
 		$uid = (int) $this->mybb->user['uid'];
 
 		$payee = $this->mybb->user['payee'];
@@ -34,17 +34,17 @@ class Manage extends Usercp
 
 			// Add payee
 			if ($this->mybb->input['payee'] != $payee) {
-    			
+
 				$this->db->update_query(
 				    'users',
 				    ['payee' => $this->db->escape_string($this->mybb->input['payee'])],
 				    'uid = ' . $uid
 				);
-				
+
 			}
 
 			if ($this->mybb->input['items']) {
-			
+
         		$this->plugins->run_hooks('bankpipe_ucp_manage_edit', $this);
 
 				$items = (array) $this->mybb->input['items'];
@@ -58,7 +58,7 @@ class Manage extends Usercp
 					if ($price == $oldprice) {
 						continue;
 					}
-					
+
 					// Delete if price has dropped to zero or below
 					if (!$price or $price <= 0) {
     					$this->db->delete_query('bankpipe_items', 'bid = ' . (int) $bid . ' AND uid = ' . $uid);
@@ -68,9 +68,9 @@ class Manage extends Usercp
     					$update = [
     						'price' => $price
     					];
-    
+
     					$this->db->update_query('bankpipe_items', $update, 'bid = ' . (int) $bid . ' AND uid = ' . $uid);
-    				
+
     				}
 
 				}
@@ -84,7 +84,7 @@ class Manage extends Usercp
             );
 
 		}
-		
+
 		$this->plugins->run_hooks('bankpipe_ucp_manage_start', $this);
 
 		add_breadcrumb($this->lang->bankpipe_nav, 'usercp.php');
@@ -158,7 +158,7 @@ class Manage extends Usercp
 		else {
 			eval("\$items = \"".$templates->get("bankpipe_manage_items_no_items")."\";");
 		}
-		
+
 		$this->plugins->run_hooks('bankpipe_ucp_manage_end', $this);
 
 		eval("\$page = \"".$templates->get("bankpipe_manage")."\";");

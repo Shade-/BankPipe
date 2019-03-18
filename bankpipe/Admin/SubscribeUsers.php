@@ -13,9 +13,9 @@ class SubscribeUsers
 	public function __construct()
 	{
 		$this->traitConstruct(['page', 'sub_tabs', 'cache']);
-    
+
         $subscriptions = $users = $uids = [];
-    
+
     	$query = $this->db->simple_select(
     	    'bankpipe_items',
     	    'bid, name, gid, primarygroup, expirygid',
@@ -25,24 +25,24 @@ class SubscribeUsers
     	while ($subscription = $this->db->fetch_array($query)) {
     		$subscriptions[$subscription['bid']] = $subscription;
     	}
-    
+
     	if (!array_filter($subscriptions)) {
     		flash_message($this->lang->bankpipe_error_missing_subscriptions, 'error');
     		admin_redirect(MAINURL);
     	}
-    
+
     	if ($this->mybb->request_method == 'post') {
-    
+
     		$startDate = get_formatted_date($this->mybb->input['startdate']);
     		$endDate = ($this->mybb->input['enddate']) ?
     		    get_formatted_date($this->mybb->input['enddate']) + 60*60*24 : // get_formatted_date returns dates adjusted to midnight, add a day to the ending one
     		    0;
-    
+
     		// Get users
     		$where = explode(',', (string) $this->mybb->input['users']);
-    
+
     		if ($where) {
-    
+
     			$query = $this->db->simple_select(
     			    'users',
     			    'uid, usergroup, additionalgroups',
@@ -52,14 +52,14 @@ class SubscribeUsers
     				$uids[] = (int) $user['uid'];
     				$users[$user['uid']] = $user;
     			}
-    
+
     		}
-    
+
     		// Get users in selected usergroups
     		$usergroups = (array) $this->mybb->input['usergroups'];
-    
+
     		if ($usergroups) {
-    
+
     			$query = $this->db->simple_select(
     			    'users',
     			    'uid, usergroup, additionalgroups',
@@ -69,33 +69,33 @@ class SubscribeUsers
     				$uids[] = (int) $user['uid'];
     				$users[$user['uid']] = $user;
     			}
-    
+
     		}
-    
+
     		// Normalize uids array
     		if ($uids) {
     			$uids = array_filter($uids);
     		}
-    
+
     		if (empty($uids)) {
     			admin_redirect(MAINURL . '&action=subscribeusers');
     		}
-    
+
     		if ($startDate > TIME_NOW or ($endDate and $endDate < TIME_NOW)) {
     			flash_message($this->lang->bankpipe_error_incorrect_dates, 'error');
     			admin_redirect(MAINURL . '&action=subscribeusers');
     		}
-    
+
     		// For multiple users, sale ID is disabled
     		if (count($uids) > 1) {
     			$this->mybb->input['sale'] = '';
     		}
-    
+
     		$bid = (int) $this->mybb->input['subscription'];
-    
+
     		// Check if not existing already
     		$activeSubs = $data = [];
-    
+
             // TO-DO: this part is built with shit logic. The following should be adapted using the new Orders and Items classes
     		$query = $this->db->simple_select(
     		    Items::PAYMENTS_TABLE,
@@ -105,15 +105,15 @@ class SubscribeUsers
     		while ($activeSub = $this->db->fetch_field($query, 'uid')) {
     			$activeSubs[] = $activeSub;
     		}
-    		
+
     		$log = new Logs;
-    
+
     		foreach ($uids as $uid) {
-    
+
     			if (!$uid or in_array($uid, $activeSubs)) {
     				continue;
     			}
-    
+
     			// Change usergroup
     			if ($subscriptions[$bid]['primarygroup']) {
     				$update = [
@@ -122,22 +122,22 @@ class SubscribeUsers
     				];
     			}
     			else {
-    
+
     				$additionalGroups = (array) explode(',', $users[$uid]['additionalgroups']);
-    
+
     				// Check if the new gid is already present and eventually add it
     				if (!in_array($subscriptions[$bid]['gid'], $additionalGroups)) {
     					$additionalGroups[] = $subscriptions[$bid]['gid'];
     				}
-    
+
     				$update = [
     					'additionalgroups' => implode(',', $additionalGroups)
     				];
-    
+
     			}
-    
+
     			$this->db->update_query('users', $update, "uid = '" . (int) $uid . "'");
-    
+
     			$arr = [
     				'bid' => $bid,
     				'uid' => (int) $uid,
@@ -149,70 +149,70 @@ class SubscribeUsers
     				'invoice' => uniqid(),
     				'type' => Orders::MANUAL
     			];
-    
+
     			$arr['oldgid'] = ($subscriptions[$bid]['expirygid']) ?
     			    (int) $subscriptions[$bid]['expirygid'] :
     			    (int) $users[$uid]['usergroup'];
-    
+
     			$data[] = $arr;
-    
+
     		}
-    
+
     		$data = array_filter($data);
-    
+
     		if ($data) {
-        		
+
     			$this->db->insert_query_multiple(Items::PAYMENTS_TABLE, $data);
-    			
+
     			// Log this
     			$bids = array_column($data, 'bid');
     			if ($bids) {
-        			
+
     			    $uids = array_column($data, 'uid');
-        			
+
         			$message = [];
-        			
+
         			if ($uids) {
-            			
+
             			$query = $this->db->simple_select('users', 'uid, username', 'uid IN (' . implode(',', $uids) . ')');
             			while ($user = $this->db->fetch_array($query)) {
                 			$message[] = build_profile_link($user['username'], $user['uid']);
             			}
-            
+
                     }
-        			
+
         			$log->save([
             			'message' => implode(', ', $message),
             			'uid' => $this->mybb->user['uid'],
             			'type' => Orders::MANUAL,
             			'bids' => $bids
         			]);
-        			
+
     			}
-    			
+
     		}
-    
+
     		// Redirect
     		flash_message($this->lang->bankpipe_success_users_added, 'success');
     		admin_redirect(MAINURL);
-    
+
     	}
-    
+
     	// Generate sub list
     	$displaySubscriptions = [];
     	foreach ($subscriptions as $sub) {
     		$displaySubscriptions[$sub['bid']] = $sub['name'];
     	}
-    
+
     	$this->page->add_breadcrumb_item($this->lang->bankpipe_manual_add, MAINURL . '&action=subscribeusers');
     	$this->page->output_header($this->lang->bankpipe_manual_add);
     	$this->page->output_nav_tabs($this->sub_tabs, 'subscribeusers');
-    
+
     	// Determine the post request attributes
     	$form = new \Form(MAINURL . "&action=subscribeusers", "post", "subscribeusers");
-    
+
     	$container = new \FormContainer($this->lang->bankpipe_manual_add);
-    
+
     	$container->output_row(
     	    $this->lang->bankpipe_manual_add_user,
     	    $this->lang->bankpipe_manual_add_user_desc,
@@ -221,14 +221,14 @@ class SubscribeUsers
         	]),
         	'users'
         );
-    
+
     	$usergroups = [];
-    
+
     	$groups_cache = $this->cache->read('usergroups');
     	foreach ($groups_cache as $group) {
     		$usergroups[$group['gid']] = $group['title'];
     	}
-    
+
     	$container->output_row(
     	    $this->lang->bankpipe_manual_add_usergroup,
     	    $this->lang->bankpipe_manual_add_usergroup_desc,
@@ -237,7 +237,7 @@ class SubscribeUsers
         		'multiple' => true
         	])
         );
-    
+
     	$container->output_row(
     	    $this->lang->bankpipe_manual_add_subscription,
     	    $this->lang->bankpipe_manual_add_subscription_desc,
@@ -245,7 +245,7 @@ class SubscribeUsers
         		'id' => 'subscription'
         	])
         );
-    
+
     	$container->output_row(
     	    $this->lang->bankpipe_manual_add_start_date,
     	    $this->lang->bankpipe_manual_add_start_date_desc,
@@ -254,7 +254,7 @@ class SubscribeUsers
         	]),
             'startdate'
         );
-    
+
     	$container->output_row(
     	    $this->lang->bankpipe_manual_add_end_date,
     	    $this->lang->bankpipe_manual_add_end_date_desc,
@@ -263,7 +263,7 @@ class SubscribeUsers
         	]),
         	'enddate'
         );
-    
+
     	$container->output_row(
     	    $this->lang->bankpipe_manual_add_sale_id,
     	    $this->lang->bankpipe_manual_add_sale_id_desc,
@@ -272,16 +272,16 @@ class SubscribeUsers
         	]),
         	'sale'
         );
-    
+
     	$container->end();
-    
+
     	$buttons = [
     		$form->generate_submit_button($this->lang->bankpipe_save)
     	];
     	$form->output_submit_wrapper($buttons);
-    	
+
     	$form->end();
-    
+
     	// JS routines
     	echo '
 <link rel="stylesheet" href="../jscripts/select2/select2.css" type="text/css" />

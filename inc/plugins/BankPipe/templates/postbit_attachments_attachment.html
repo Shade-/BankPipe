@@ -1,6 +1,6 @@
 <br />{$attachment['icon']}&nbsp;&nbsp;{$attachment['filename']} ({$lang->postbit_attachment_size} {$attachment['filesize']} / {$lang->postbit_attachment_downloads} {$attachment['downloads']}) – <b>{$paidAttachment['price']}{$mybb->settings['bankpipe_currency']}</b>
 <div style="display: inline-block; margin: 8px">
-    <a href="#" class="purchase button">
+    <a href="#" class="purchase button" data-items="{$paidAttachment['bid']}">
         {$lang->bankpipe_buy_now}
     </a>
 </div>

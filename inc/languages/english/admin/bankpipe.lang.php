@@ -258,7 +258,7 @@ $l['bankpipe_error_duplicate_code'] = "The code you entered is already in use.";
 $l['bankpipe_error_cannot_exceed_hundreds'] = "You cannot enter a value more than or equal to 100 when using percentages.";
 
 // Tasks
-$l['task_bankpipe_ran'] = 'BankPipe cleanup task has ran successfully.';
+$l['task_bankpipe_ran'] = 'Subscriptions and their buyers have been cleared and/or notified successfully.';
 
 // Permissions
 $l['viewing_field_candownloadpaidattachments'] = $l['bankpipe_can_dl_paid_attachs'] = 'Can download paid attachments without purchasing?';

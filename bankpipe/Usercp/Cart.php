@@ -14,17 +14,17 @@ class Cart extends Usercp
 	)
 	{
 		$this->traitConstruct();
-		
+
 		global $theme, $templates, $headerinclude, $header, $footer, $usercpnav;
 		global $mybb, $lang; // Required for bankpipe_script
-		
+
 		$cookies = new Cookies;
 		$itemsHandler = new Items;
 		$permissions = new Permissions;
 		$messages = new Messages;
-		
+
 		$existingItems = $cookies->read('items');
-		
+
 		// Errors
 		if ($errors) {
 			$errors = inline_error($errors);
@@ -35,25 +35,25 @@ class Cart extends Usercp
 			$errors = [];
 
 			$aid = (int) $this->mybb->input['aid'];
-			
+
 			$this->plugins->run_hooks('bankpipe_ucp_cart_add_start', $this);
-			
+
 			// Does this item exist?
 			if ($aid) {
-    			
+
     			$exists = $itemsHandler->getAttachment($aid);
-    			
+
     			if (!$exists['bid']) {
         			$errors[] = $this->lang->bankpipe_cart_item_unknown;
     			}
     			else {
-        			
+
         			// Get first item out of existing items
         			$firstItem = (int) reset($existingItems);
         			if ($firstItem and $aid) {
-        
+
         				$infos = [];
-        
+
         				// Merchant check – since some gateways (like PayPal) can't handle multiple payees at once,
         				// we must block every attempt to stack items from different merchants. The first item is enough,
         				// as if there are more, this check will prevent stacked items to be part of a different merchant.
@@ -66,17 +66,17 @@ class Cart extends Usercp
         				while ($info = $this->db->fetch_array($query)) {
         					$infos[$info['aid']] = $info['payee'];
         				}
-        
+
         				if ($infos[$firstItem] and $infos[$firstItem] != $infos[$aid]) {
         					$errors[] = $this->lang->bankpipe_cart_payee_different;
         				}
-        
+
         			}
-        			
+
     			}
-    			
+
 			}
-			
+
 			$args = [&$this, &$errors];
 			$this->plugins->run_hooks('bankpipe_ucp_cart_add_end', $args);
 
@@ -102,7 +102,7 @@ class Cart extends Usercp
 		}
 
 		if ($this->mybb->input['remove']) {
-			
+
 			$this->plugins->run_hooks('bankpipe_ucp_cart_remove', $this);
 
 			$aid = (int) $this->mybb->input['aid'];
@@ -149,7 +149,7 @@ class Cart extends Usercp
 				while ($discount = $this->db->fetch_array($query)) {
 
 					$discount['suffix'] = ($discount['type'] == 1) ? '%' : ' ' . $this->mybb->settings['bankpipe_currency'];
-					
+
 					$code = ($discount['name']) ? $discount['name'] : $discount['code'];
 
 					eval("\$appliedDiscounts .= \"".$templates->get("bankpipe_discounts_code")."\";");
@@ -159,8 +159,6 @@ class Cart extends Usercp
 				}
 
 			}
-
-			$environment = ($this->mybb->settings['bankpipe_sandbox']) ? 'sandbox' : 'production';
 
 			eval("\$discountArea = \"".$templates->get("bankpipe_discounts")."\";");
 
@@ -245,11 +243,12 @@ class Cart extends Usercp
 			eval("\$items = \"".$templates->get("bankpipe_cart_no_items")."\";");
 		}
 		else {
-    		
+
     		eval("\$noItemsTemplate = \"".$templates->get("bankpipe_cart_no_items")."\";");
     		$noItemsTemplate = json_encode($noItemsTemplate);
+
 		}
-        
+
         eval("\$script = \"".$templates->get("bankpipe_script")."\";");
 
 		$this->plugins->run_hooks('bankpipe_ucp_cart_end', $this);

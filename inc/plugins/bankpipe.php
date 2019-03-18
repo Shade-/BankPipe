@@ -212,7 +212,7 @@ email=Email",
 			expires int(10) UNSIGNED NOT NULL DEFAULT '0',
 			primarygroup tinyint(1) NOT NULL DEFAULT '1',
 			expirygid int(5) NOT NULL DEFAULT '0',
-			type tinyint(1) NOT NULL
+			type tinyint(1) NOT NULL,
 			KEY aid (aid)
         ) ENGINE=MyISAM{$collation};
 		");
@@ -225,6 +225,7 @@ email=Email",
 		$db->write_query("
 		CREATE TABLE " . TABLE_PREFIX . "bankpipe_log (
 			lid int(8) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+			invoice varchar(32) NOT NULL DEFAULT '',
 			type tinyint(1) NOT NULL,
 			bids text,
 			uid int(10) NOT NULL DEFAULT '0',
@@ -275,6 +276,7 @@ email=Email",
 			pid int(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
 			uid int(10) NOT NULL DEFAULT '0',
 			payee int(10) NOT NULL DEFAULT '0',
+			payee_email text,
 			payment_id varchar(32) NOT NULL DEFAULT '',
 			sale text,
 			refund text,
@@ -786,13 +788,17 @@ function bankpipe_edit_attachments()
 {
 	global $templates, $db, $mybb, $forumpermissions, $attachedfile, $pid, $tid, $fid, $items, $plugins;
 
+	if (!$mybb->settings['bankpipe_third_party']) {
+		return false;
+	}
+
 	if (!(new Permissions)->simpleCheck([], $fid) or !$mybb->user['payee']) {
 		return false;
 	}
 
 	$aids = [];
 	$items = new Items;
-	
+
 	$attachedfile = $plugins->run_hooks('bankpipe_update_paid_attachment', $attachedfile);
 
 	if (!empty($mybb->input['paidattachs']['update']) and $mybb->input['newattachment'] and $attachedfile and $attachedfile['aid'] and !$attachedfile['error'] and $mybb->settings['enableattachments'] == 1 and $mybb->request_method == 'post') {
@@ -815,6 +821,7 @@ function bankpipe_edit_attachments()
 
 				// Remove the old attachment
 				remove_attachment($pid, "", $update);
+
 			}
 
 		}
@@ -844,7 +851,7 @@ function bankpipe_edit_attachments()
 
 	// Cache this post attachments
 	$items->getAttachments($aids);
-	
+
 	$plugins->run_hooks('bankpipe_edit_attachments');
 
 	control_object($templates, '
@@ -864,6 +871,10 @@ function bankpipe_attachment_options()
 {
 	global $attachment, $paidOptions, $templates, $attachcolspan, $mybb, $post_errors, $lang, $items, $plugins;
 
+	if (!$mybb->settings['bankpipe_third_party']) {
+		return false;
+	}
+
 	bankpipe_load_lang();
 
 	$attachment['paid'] = $items->getAttachment($attachment['aid']);
@@ -873,7 +884,7 @@ function bankpipe_attachment_options()
 	}
 
 	$attachcolspan = 2;
-	
+
 	$plugins->run_hooks('bankpipe_attachment_options');
 
 	eval("\$paidOptions = \"".$templates->get("bankpipe_attachment_options")."\";");
@@ -889,7 +900,7 @@ function bankpipe_update_paid_attachment($args)
 	}
 
 	$attachedfile = (array) $args['attachedfile'];
-	
+
 	$attachedfile = $plugins->run_hooks('bankpipe_update_paid_attachment', $attachedfile);
 
 	if (!empty($mybb->input['paidattachs']['update']) and $attachedfile['aid']) {
@@ -912,7 +923,7 @@ function bankpipe_update_paid_attachment($args)
 
 				// Remove the old attachment
 				remove_attachment($pid, "", $update);
-				
+
 			}
 
 		}
@@ -921,12 +932,16 @@ function bankpipe_update_paid_attachment($args)
 
 function bankpipe_attachments_postbit($data)
 {
-    global $templates, $currentAttachment, $attachcache, $items, $plugins;
-    
-    if (!$items) {
-        $items = new Items;
+    global $templates, $currentAttachment, $attachcache, $orders, $plugins, $payments, $items, $cookies;
+
+    if (!$orders) {
+        $orders = new Orders;
     }
-    
+
+    if (!$cookies) {
+        $cookies = new Cookies;
+    }
+
 	bankpipe_load_lang();
 
 	$search = [];
@@ -941,8 +956,22 @@ function bankpipe_attachments_postbit($data)
 	};
 
 	// Cache this thread attachments
-	$items->getAttachments($search);
-	
+	$items = (new Items)->getAttachments($search);
+
+	$bids = array_keys($items);
+
+	if ($bids) {
+
+    	$payments = $orders->get([
+        	'uid' => $mybb->user['uid'],
+        	'active' => 1,
+        	'bid IN (' . implode(',', $bids) . ')'
+    	], [
+        	'includeItemsInfo' => true
+    	]);
+
+	}
+
 	$data = $plugins->run_hooks('bankpipe_attachments_postbit', $data);
 
 	$currentAttachment = $data['attachment'];
@@ -967,8 +996,8 @@ function bankpipe_hijack_templates($title)
 		return $title;
 	}
 
-	global $currentAttachment, $paidAttachment, $db, $mybb, $showPayments, $lang, $forumpermissions, $items, $plugins;
-	
+	global $currentAttachment, $paidAttachment, $db, $mybb, $showPayments, $lang, $forumpermissions, $items, $plugins, $payments, $cookies;
+
 	$plugins->run_hooks('bankpipe_hijack_templates_start');
 
 	if (!$showPayments) {
@@ -979,7 +1008,8 @@ function bankpipe_hijack_templates($title)
 		return $title;
 	}
 
-	$paidAttachment = $items->getAttachment($currentAttachment['aid']);
+    $key = array_search($currentAttachment['aid'], array_column($items, 'aid', 'bid'));
+	$paidAttachment = $items[$key];
 
 	// This attachment is paid
 	if ($paidAttachment['aid']) {
@@ -988,14 +1018,24 @@ function bankpipe_hijack_templates($title)
 			return 'bankpipe_' . $title . '_not_allowed';
 		}
 
+		$unlocked = false;
+		foreach ($payments as $invoice => $payment) {
+
+    		if (in_array($paidAttachment['bid'], array_column($payment['items'], 'bid'))) {
+        		$unlocked = true;
+        		break;
+    		}
+
+		}
+
 		// This attachment has not been unlocked yet
-		if (!$paidAttachment['payment_id'] and $mybb->user['uid'] != $paidAttachment['itemuid']) {
+		if (!$unlocked and $mybb->user['uid'] != $paidAttachment['itemuid']) {
 
 			$showPayments = true;
 
 			if ($mybb->settings['bankpipe_cart_mode']) {
 
-				$existingItems = (new Cookies)->read('items');
+				$existingItems = $cookies->read('items');
 
 				if (in_array($paidAttachment['aid'], $existingItems)) {
 					return 'bankpipe_' . $title . '_cart_added';
@@ -1012,7 +1052,7 @@ function bankpipe_hijack_templates($title)
 		}
 
 	}
-	
+
 	$plugins->run_hooks('bankpipe_hijack_templates_end', $paidAttachment);
 
 	return $title;
@@ -1028,12 +1068,9 @@ function bankpipe_pre_output_page(&$content)
 
 	bankpipe_load_lang();
 
-	$environment = ($mybb->settings['bankpipe_sandbox']) ? 'sandbox' : 'production';
-
 	if ($showPayments) {
 
 		eval("\$payments = \"".$templates->get("bankpipe_script")."\";");
-
 		$content = str_replace('</head>', '</head>' . $payments, $content);
 
 	}
@@ -1054,15 +1091,15 @@ function bankpipe_profile()
         	'type NOT IN (' . implode(',', $exclude) . ')',
 		    'uid' => $memprofile['uid']
         ]);
-	
+
         $orders = $plugins->run_hooks('bankpipe_profile', $orders);
 
 		if ($orders) {
 
 			foreach ($orders as $order) {
-    			
+
     			$names = implode(', ', array_column($order['items'], 'name'));
-    			
+
     			$order['date'] = my_date('relative', $order['date']);
 
 				if ($order['refund']) {
@@ -1093,37 +1130,56 @@ function bankpipe_profile()
 
 function bankpipe_attachment_start()
 {
-	global $mybb, $attachment, $items;
+	global $mybb, $attachment, $item, $payments;
 
 	if ($mybb->user['uid'] == 0) {
 		return false;
 	}
-	
-	if (!$items) {
-    	$items = new Items;
+
+	$item = (new Items)->getAttachment($attachment['aid']);
+
+	if ($item['bid']) {
+
+    	$payments = (new Orders)->get([
+        	'uid' => $mybb->user['uid'],
+        	'active' => 1,
+        	'bid' => $item['bid']
+    	]);
+
 	}
 
-	$paidAttach = $items->getAttachment($attachment['aid']);
-
-	if ($paidAttach['aid'] == $attachment['aid']) {
+	if ($item['aid'] == $attachment['aid']) {
 		$mybb->input['skip'] = true;
 	}
 }
 
 function bankpipe_attachment_end()
 {
-	global $mybb, $attachment, $forumpermissions, $db, $items, $plugins;
+	global $mybb, $attachment, $forumpermissions, $db, $item, $payments, $plugins;
 
-    // $items has been defined in bankpipe_attachment_start()
-	$paidAttach = $items->getAttachment($attachment['aid']);
-	$paid = ($paidAttach['aid'] == $attachment['aid']);
-	
+	$paid = ($item['aid'] == $attachment['aid']);
+
+	$pid = 0;
+
 	$plugins->run_hooks('bankpipe_view_attachment_start');
 
 	if (!$forumpermissions['candownloadpaidattachments'] and $paid) {
 
+    	$unlocked = false;
+		foreach ($payments as $invoice => $payment) {
+
+    		$pids = array_column($payment['items'], 'pid', 'bid');
+
+    		if (in_array($item['bid'], array_column($payment['items'], 'bid'))) {
+        		$pid = $pids[$item['bid']];
+        		$unlocked = true;
+        		break;
+    		}
+
+		}
+
 		// This attachment has not been unlocked yet
-		if (!$paidAttach['payment_id'] and $mybb->user['uid'] != $paidAttach['itemuid']) {
+		if (!$unlocked and $mybb->user['uid'] != $item['itemuid']) {
 
 			// Revert the download count update
 			if (!isset($mybb->input['thumbnail'])) {
@@ -1138,7 +1194,7 @@ function bankpipe_attachment_end()
 	}
 
 	// Log this download
-	if ($paid and $mybb->user['uid'] != $paidAttach['itemuid']) {
+	if ($paid and $mybb->user['uid'] != $item['itemuid']) {
 
 		$log = [
 			'aid' => (int) $attachment['aid'],
@@ -1153,24 +1209,24 @@ function bankpipe_attachment_end()
 			$log['pid'] = -1;
 		}
 		else {
-			$log['pid'] = (int) $paidAttach['pid'];
+			$log['pid'] = (int) $pid;
 		}
 
 		$db->insert_query('bankpipe_downloadlogs', $log);
 
 	}
-	
+
 	$plugins->run_hooks('bankpipe_view_attachment_end');
 }
 
 function bankpipe_delete_attachment($attachment)
 {
     global $db, $plugins;
-    
+
 	if ($attachment['aid']) {
 		$db->delete_query('bankpipe_items', 'aid = ' . (int) $attachment['aid']);
 	}
-	
+
 	$attachment = $plugins->run_hooks('bankpipe_delete_attachment', $attachment);
 
 	return $attachment;
@@ -1225,23 +1281,23 @@ function bankpipe_save_paid_item()
 	}
 
 	if ($mybb->input['paidattachs'] and is_array($mybb->input['paidattachs'])) {
-    	
+
     	$items = [];
-    	
+
     	foreach ($mybb->input['paidattachs'] as $aid => $item) {
-        	
+
         	if ($aid == 'update') {
             	continue;
         	}
-        	
+
         	$item['aid'] = $aid;
         	$item['uid'] = $mybb->user['uid'];
         	$item['type'] = Items::ATTACHMENT;
-        	
+
         	$items[] = $item;
-        	
+
     	}
-    	
+
         return (new Items)->insert($items);
 
 	}

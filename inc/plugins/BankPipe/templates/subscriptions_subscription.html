@@ -1,13 +1,13 @@
 <tr>
 	<td class="trow1">
 		<strong>{$subscription['name']}</strong>
-		<div class="smalltext">{$subscription['description']}</div>
+		<div class="smalltext">{$subscription['htmldescription']}</div>
 	</td>
 	<td class="trow1" align="center">
 		{$price}
 	</td>
 	<td class="trow1" align="center">
-		<a class="purchase button" data-items="{$subscription['bid']}">
+		<a href="#" class="purchase button" data-items="{$subscription['bid']}">
     		{$this->lang->bankpipe_buy_now}
 		</a>
 	</td>

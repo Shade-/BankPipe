@@ -83,15 +83,12 @@ $l['bankpipe_notification_purchase'] = "Dear merchant,
 
 [list]{3}[/list]
 
-This transaction was [b]{4}{6}[/b], of which {5}{6} were retained by PayPal. The money has been sent to {7}.
+This transaction was [b]{4}{7}[/b], of which {5}{7} were retained by PayPal. A net revenue of [b]{6}{7}[/b] has been credited to {8}.
 
 Best regards,
-{8}";
+{9}";
 
 // Messages
-$l['bankpipe_error_could_not_complete'] = "Your payment may have completed but the transaction (state: {1}) may have been put on hold for some reason. Therefore, you have not been granted access to what you were trying to purchase. Please get in touch with an administrator to solve this issue.<br><br>Thank you for your comprehension.";
-$l['bankpipe_error_pending_payment'] = "Your payment is currently pending completion. At the current stages, we can't handle your payment automatically. Therefore, you have not been granted access to what you were trying to purchase. Please get in touch with an administrator to complete your purchase.<br><br>Thank you for your comprehension.";
-$l['bankpipe_error_could_not_complete_refund'] = "There was an issue completing this refund (state: {1}). Please try again in some minutes, this could be due to PayPal temporary issues.";
 $l['bankpipe_error_code_not_found'] = "This promo code does not appear to be valid.";
 $l['bankpipe_error_code_expired'] = "This promo code has expired and is no longer valid.";
 $l['bankpipe_error_code_not_allowed'] = "You are not allowed to apply this promo code.";
@@ -101,24 +98,32 @@ $l['bankpipe_error_code_already_applied'] = "This promo code has already been ap
 $l['bankpipe_error_missing_required_field'] = "Some required fields are missing. Please ensure you have filled all the required fields before trying to purchase an item.";
 $l['bankpipe_error_functionality_not_allowed'] = "You are not allowed to use this functionality. Please contact an administrator to ask for permissions.";
 $l['bankpipe_error_module_not_exists'] = "This module does not exist.";
+$l['bankpipe_error_webhook_signature_check_failed'] = 'Signature check failed. The webhook listener has encountered some problems communicating with PayPal.';
+$l['bankpipe_error_webhook_no_matching_items'] = 'No matching items were found for sale {1}';
+$l['bankpipe_error_order_not_found'] = 'The order you are trying to send has expired or has been lost. Please go back and try again.';
+$l['bankpipe_error_items_not_found'] = 'The items you are trying to purchase cannot be found. Please go back and try again.';
+$l['bankpipe_error_email_not_valid'] = 'Merchant\'s email is not valid. This item cannot be purchased at the moment.';
 
 $l['bankpipe_success_purchased_item'] = "You have successfully purchased {1}. You will be redirected to the purchase recap in some seconds.";
 $l['bankpipe_success_settings_edited'] = "Settings edited";
 $l['bankpipe_success_settings_edited_desc'] = "Your items management settings have been edited successfully.";
 
+$l['bankpipe_payment_cancelled'] = 'You have cancelled the payment. If you want to buy the items you have selected, please continue with the payment.';
+$l['bankpipe_payment_successful'] = 'Your payment has been processed successfully. Reference: {reference}. You will be redirected to the order recap in a moment.';
+$l['bankpipe_payment_pending'] = 'Your payment is currently pending approval. You will be granted access as soon as the payment is resolved successfully. Reference: {reference}.';
+
+$l['bankpipe_response_malformed'] = 'The server returned a malformed response. A raw representation of the response is available in your browser\\\'s console. Please report it to an administrator.';
+
+$l['bankpipe_discount_previous_item_desc'] = "This discount has been applied because you have already purchased another subscription in the past.";
+$l['bankpipe_discount_code_desc'] = "This discount code has been validated and applied to your total.";
+
 // Misc
 $l['bankpipe_discounts_applied'] = "Discounts applied: {1}";
 $l['bankpipe_discount_previous_item'] = "Previous subscriptions discount";
-$l['bankpipe_discount_previous_item_desc'] = "This discount has been applied because you have already purchased another subscription in the past.";
-$l['bankpipe_discount_code_desc'] = "This discount code has been validated and applied to your total.";
 $l['bankpipe_add_to_cart'] = "Add to cart";
 $l['bankpipe_remove_from_cart'] = "Remove from cart";
 $l['bankpipe_buy_now'] = "Buy now with PayPal";
 $l['bankpipe_overlay_preparing_payment'] = "Preparing payment...";
-$l['bankpipe_payment_cancelled'] = 'You have cancelled the payment. If you want to buy the items you have selected, please continue with the payment.';
-$l['bankpipe_payment_successful'] = 'Your payment has been processed successfully. Reference: {reference}. You will be redirected to the order recap in a moment.';
-$l['bankpipe_payment_pending'] = 'Your payment is currently pending approval. You will be granted access as soon as the payment is resolved successfully. Reference: {reference}.';
 $l['bankpipe_payment_waiting_confirmation'] = 'Waiting payment confirmation from the gateway...';
-$l['bankpipe_response_malformed'] = 'The server returned a malformed response. A raw representation of the response is available in your browser\\\'s console. Please report it to an administrator.';
 
-$l['task_bankpipe_ran'] = 'BankPipe cleanup task has ran successfully.';
+$l['task_bankpipe_ran'] = 'Subscriptions and their buyers have been cleared and/or notified successfully.';

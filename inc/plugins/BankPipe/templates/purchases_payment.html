@@ -12,24 +12,43 @@
 					<table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder">
 						<thead>
 							<tr>
-								<td class="thead" colspan="3"><strong>{$this->lang->bankpipe_purchases_payment_transaction}{$order['payment_id']}</strong></td>
-							</tr>
-							<tr>
-								<th class="tcat">{$this->lang->bankpipe_purchases_payment_item}</th>
-								<th class="tcat" colspan="2"></th>
+								<td class="thead" colspan="2">
+									<strong>{$this->lang->bankpipe_purchases_payment_transaction}{$order['payment_id']}</strong>
+								</td>
 							</tr>
 						</thead>
 						<tbody>
-							{$items}
-						</tbody>
-						<tfoot>
 							<tr>
-								<td class="trow2" colspan="2"></td>
-								<td class="trow2" align="center">
-									<b>{$this->lang->bankpipe_purchases_payment_total}{$order['total']} {$order['currency']}</b>
+								<td class="trow1" width="50%" style="vertical-align: top">
+									<table border="0" cellspacing="0" cellpadding="{$theme['tablespace']}" class="tborder">
+										<tr>
+											<td class="tcat" width="30%"><b>{$this->lang->bankpipe_purchases_payment_date}</b></td>
+											<td class="trow1">{$date}</td>
+										</tr>
+										<tr>
+											<td class="tcat"><b>{$this->lang->bankpipe_purchases_payment_merchant}</b></td>
+											<td class="trow1">{$merchant}</td>
+										</tr>
+										{$appliedDiscounts}
+									</table>
+								</td>
+								<td class="trow1">
+									<table border="0" cellspacing="0" cellpadding="{$theme['tablespace']}" class="tborder">
+										<tr>
+											<th class="tcat">{$this->lang->bankpipe_purchases_payment_item}</th>
+											<th class="tcat" align="center">{$this->lang->bankpipe_purchases_payment_cost}</th>
+										</tr>
+										{$items}
+										<tr>
+											<td class="trow2" align="right"><b>{$this->lang->bankpipe_purchases_payment_total}</b></td>
+											<td class="trow2" align="center">
+												<b>{$order['total']} {$order['currency']}</b>
+											</td>
+										</tr>
+									</table>
 								</td>
 							</tr>
-						</tfoot>
+						</tbody>
 					</table>
 				</td>
 			</tr>
