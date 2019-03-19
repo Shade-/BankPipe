@@ -4,223 +4,223 @@
 
 function task_bankpipe($task)
 {
-	global $db, $lang, $mybb, $cache;
+    global $db, $lang, $mybb, $cache;
 
-	$lang->load('bankpipe');
+    $lang->load('bankpipe');
 
-	// Get notifications info
-	$notifications = $expiryDates = [];
-	$now = TIME_NOW;
+    // Get notifications info
+    $notifications = $expiryDates = [];
+    $now = TIME_NOW;
 
-	$query = $db->simple_select('bankpipe_notifications', '*', '', ['order_by' => 'daysbefore DESC']);
-	while ($notification = $db->fetch_array($query)) {
+    $query = $db->simple_select('bankpipe_notifications', '*', '', ['order_by' => 'daysbefore DESC']);
+    while ($notification = $db->fetch_array($query)) {
 
-		// Calculate the last dateline to include in the range – the others are too far away to be processed
-		$dateline = ($now + ($notification['daysbefore']*60*60*24));
+        // Calculate the last dateline to include in the range – the others are too far away to be processed
+        $dateline = ($now + ($notification['daysbefore']*60*60*24));
 
-		$expiryDates[] = $dateline;
+        $expiryDates[] = $dateline;
 
-		$notifications[$dateline] = $notification;
+        $notifications[$dateline] = $notification;
 
-	}
+    }
 
-	function closest($search, $arr) {
-		$closest = null;
-		foreach ($arr as $item) {
-			if ($closest === null || abs($search - $closest) > abs($item - $search)) {
-				$closest = $item;
-			}
-		}
-		return $closest;
-	}
+    function closest($search, $arr) {
+        $closest = null;
+        foreach ($arr as $item) {
+            if ($closest === null || abs($search - $closest) > abs($item - $search)) {
+                $closest = $item;
+            }
+        }
+        return $closest;
+    }
 
-	$where = ($expiryDates and max($expiryDates)) ? ' AND expires < ' . max($expiryDates) : '';
+    $where = ($expiryDates and max($expiryDates)) ? ' AND expires < ' . max($expiryDates) : '';
 
-	require_once MYBB_ROOT . "inc/datahandlers/pm.php";
-	$pmhandler                 = new PMDataHandler();
-	$pmhandler->admin_override = true;
+    require_once MYBB_ROOT . "inc/datahandlers/pm.php";
+    $pmhandler                 = new PMDataHandler();
+    $pmhandler->admin_override = true;
 
-	$subscriptions = $uids = [];
+    $subscriptions = $uids = [];
 
-	// Process expiring subscriptions
-	// TO-DO: use the Orders class
-	$query = $db->simple_select('bankpipe_payments', '*', 'active = 1 AND expires > 0' . $where, ['order_by' => 'expires ASC']);
-	while ($subscription = $db->fetch_array($query)) {
+    // Process expiring subscriptions
+    // TO-DO: use the Orders class
+    $query = $db->simple_select('bankpipe_payments', '*', 'active = 1 AND expires > 0' . $where, ['order_by' => 'expires ASC']);
+    while ($subscription = $db->fetch_array($query)) {
 
-		$subscriptions[] = $subscription;
-		$uids[] = $subscription['uid'];
+        $subscriptions[] = $subscription;
+        $uids[] = $subscription['uid'];
 
-	}
+    }
 
-	if ($subscriptions) {
+    if ($subscriptions) {
 
-		// Get associated items
-		$items = $emails = $users = [];
+        // Get associated items
+        $items = $emails = $users = [];
 
-		$query = $db->simple_select('bankpipe_items', 'name, primarygroup, price, bid', 'bid IN (' . implode(',', array_column($subscriptions, 'bid')) . ')');
-		while($item = $db->fetch_array($query)) {
-			$items[$item['bid']] = $item;
-		}
+        $query = $db->simple_select('bankpipe_items', 'name, primarygroup, price, bid', 'bid IN (' . implode(',', array_column($subscriptions, 'bid')) . ')');
+        while($item = $db->fetch_array($query)) {
+            $items[$item['bid']] = $item;
+        }
 
-		// Get users usernames
-		$query = $db->simple_select('users', 'uid, username, usergroup, additionalgroups, email, displaygroup', 'uid IN (' . implode(',', $uids) . ')');
-		while($user = $db->fetch_array($query)) {
-			$users[$user['uid']] = $user;
-		}
+        // Get users usernames
+        $query = $db->simple_select('users', 'uid, username, usergroup, additionalgroups, email, displaygroup', 'uid IN (' . implode(',', $uids) . ')');
+        while($user = $db->fetch_array($query)) {
+            $users[$user['uid']] = $user;
+        }
 
-		$updateMailqueue = false;
+        $updateMailqueue = false;
 
-		// Process
-		foreach ($subscriptions as $subscription) {
+        // Process
+        foreach ($subscriptions as $subscription) {
 
-			// This subscription has expired
-			if ($subscription['expires'] < $now) {
+            // This subscription has expired
+            if ($subscription['expires'] < $now) {
 
-				// Revert usergroup
-				$oldGroup = (int) $subscription['oldgid'];
+                // Revert usergroup
+                $oldGroup = (int) $subscription['oldgid'];
 
-				if ($oldGroup) {
+                if ($oldGroup) {
 
-					if ($items[$subscription['bid']]['primarygroup']) {
+                    if ($items[$subscription['bid']]['primarygroup']) {
 
-						$data = [
-							'usergroup' => $oldGroup
-						];
+                        $data = [
+                            'usergroup' => $oldGroup
+                        ];
 
-						// Change display group only if set differently from "use primary"
-						if ($users[$subscription['uid']]['displaygroup'] != 0) {
-							$data['displaygroup'] = 0;
-						}
+                        // Change display group only if set differently from "use primary"
+                        if ($users[$subscription['uid']]['displaygroup'] != 0) {
+                            $data['displaygroup'] = 0;
+                        }
 
-					}
-					else {
+                    }
+                    else {
 
-						$additionalGroups = (array) explode(',', $users[$subscription['uid']]['additionalgroups']);
+                        $additionalGroups = (array) explode(',', $users[$subscription['uid']]['additionalgroups']);
 
-						// Check if the old gid is already present and eventually add it
-						if (!in_array($oldGroup, $additionalGroups)) {
-							$additionalGroups[] = $oldGroup;
-						}
+                        // Check if the old gid is already present and eventually add it
+                        if (!in_array($oldGroup, $additionalGroups)) {
+                            $additionalGroups[] = $oldGroup;
+                        }
 
-						// Remove the new gid
-						if (($key = array_search($subscription['newgid'], $additionalGroups)) !== false) {
-							unset($additionalGroups[$key]);
-						}
+                        // Remove the new gid
+                        if (($key = array_search($subscription['newgid'], $additionalGroups)) !== false) {
+                            unset($additionalGroups[$key]);
+                        }
 
-						$data = [
-							'additionalgroups' => implode(',', $additionalGroups)
-						];
+                        $data = [
+                            'additionalgroups' => implode(',', $additionalGroups)
+                        ];
 
-					}
+                    }
 
-					$db->update_query('users', $data, "uid = '" . (int) $subscription['uid'] . "'");
+                    $db->update_query('users', $data, "uid = '" . (int) $subscription['uid'] . "'");
 
-				}
+                }
 
-				// Mark payment as expired
-				$db->update_query('bankpipe_payments', ['active' => 0], "pid = '" . (int) $subscription['pid'] . "'");
+                // Mark payment as expired
+                $db->update_query('bankpipe_payments', ['active' => 0], "pid = '" . (int) $subscription['pid'] . "'");
 
-			}
+            }
 
-			// Send reminder
-			$closest = closest($subscription['expires'], $expiryDates);
-			$notification = $notifications[$closest];
+            // Send reminder
+            $closest = closest($subscription['expires'], $expiryDates);
+            $notification = $notifications[$closest];
 
-			// Send only when expired if daysbefore = 0
-			if ($notification['daysbefore'] == 0 and $subscription['expires'] > $now) {
-				$keys = array_keys($notifications);
-				$notification = $notifications[$keys[array_search($closest, $keys)-1]];
-			}
+            // Send only when expired if daysbefore = 0
+            if ($notification['daysbefore'] == 0 and $subscription['expires'] > $now) {
+                $keys = array_keys($notifications);
+                $notification = $notifications[$keys[array_search($closest, $keys)-1]];
+            }
 
-			if ($notification) {
+            if ($notification) {
 
-				// Already sent this notification
-				if ($subscription['sentnotification'] == $notification['nid']) {
-					continue;
-				}
+                // Already sent this notification
+                if ($subscription['sentnotification'] == $notification['nid']) {
+                    continue;
+                }
 
-				$daysleft = (int) (($subscription['expires'] - $now) / (60*60*24));
+                $daysleft = (int) (($subscription['expires'] - $now) / (60*60*24));
 
-				if ($daysleft <= 0) {
-					$daysleft = 0;
-				}
+                if ($daysleft <= 0) {
+                    $daysleft = 0;
+                }
 
-				$title = $notification['title'];
-				$message = $notification['description'];
+                $title = $notification['title'];
+                $message = $notification['description'];
 
-				$find = [
-					"{user}",
-					"{price}",
-					"{days}",
-					"{name}"
-				];
+                $find = [
+                    "{user}",
+                    "{price}",
+                    "{days}",
+                    "{name}"
+                ];
 
-				$replace = [
-					$users[$subscription['uid']]['username'],
-					$items[$subscription['bid']]['price'],
-					$daysleft,
-					$items[$subscription['bid']]['name']
-				];
+                $replace = [
+                    $users[$subscription['uid']]['username'],
+                    $items[$subscription['bid']]['price'],
+                    $daysleft,
+                    $items[$subscription['bid']]['name']
+                ];
 
-				$title = str_replace($find, $replace, $title);
-				$message = str_replace($find, $replace, $message);
+                $title = str_replace($find, $replace, $title);
+                $message = str_replace($find, $replace, $message);
 
-				if ($notification['method'] == 'pm') {
+                if ($notification['method'] == 'pm') {
 
-					$fromid = ($mybb->settings['bankpipe_notification_uid']) ?
-					    (int) $mybb->settings['bankpipe_notification_uid'] :
-					    -1;
+                    $fromid = ($mybb->settings['bankpipe_notification_uid']) ?
+                        (int) $mybb->settings['bankpipe_notification_uid'] :
+                        -1;
 
-					$pm = [
-						"subject" => $title,
-						"message" => $message,
-						"fromid" => $fromid,
-						"toid" => [
-							$subscription['uid']
-						]
-					];
+                    $pm = [
+                        "subject" => $title,
+                        "message" => $message,
+                        "fromid" => $fromid,
+                        "toid" => [
+                            $subscription['uid']
+                        ]
+                    ];
 
-					$pm['bccid'] = ($mybb->settings['bankpipe_notification_cc']) ?
-					    explode(',', $mybb->settings['bankpipe_notification_cc']) :
-					    [];
+                    $pm['bccid'] = ($mybb->settings['bankpipe_notification_cc']) ?
+                        explode(',', $mybb->settings['bankpipe_notification_cc']) :
+                        [];
 
-					$pmhandler->set_data($pm);
+                    $pmhandler->set_data($pm);
 
-					// Let the PM handler do all the hard work
-					if ($pmhandler->validate_pm()) {
-						$pmhandler->insert_pm();
-					}
+                    // Let the PM handler do all the hard work
+                    if ($pmhandler->validate_pm()) {
+                        $pmhandler->insert_pm();
+                    }
 
-				}
-				else if ($notification['method'] == 'email' and $users[$subscription['uid']]['email']) {
+                }
+                else if ($notification['method'] == 'email' and $users[$subscription['uid']]['email']) {
 
-					$emails[] = [
-						"mailto" => $db->escape_string($users[$subscription['uid']]['email']),
-						"mailfrom" => '',
-						"subject" => $db->escape_string($title),
-						"message" => $db->escape_string($message),
-						"headers" => ''
-					];
+                    $emails[] = [
+                        "mailto" => $db->escape_string($users[$subscription['uid']]['email']),
+                        "mailfrom" => '',
+                        "subject" => $db->escape_string($title),
+                        "message" => $db->escape_string($message),
+                        "headers" => ''
+                    ];
 
-					$updateMailqueue = true;
+                    $updateMailqueue = true;
 
-				}
+                }
 
-				$db->update_query('bankpipe_payments', ['sentnotification' => $notification['nid']], 'pid = ' . $subscription['pid']);
+                $db->update_query('bankpipe_payments', ['sentnotification' => $notification['nid']], 'pid = ' . $subscription['pid']);
 
-			}
+            }
 
-		}
+        }
 
-		if ($emails) {
-			$db->insert_query_multiple("mailqueue", $emails);
-		}
+        if ($emails) {
+            $db->insert_query_multiple("mailqueue", $emails);
+        }
 
-		if ($updateMailqueue) {
-			$cache->update_mailqueue();
-		}
+        if ($updateMailqueue) {
+            $cache->update_mailqueue();
+        }
 
-	}
+    }
 
-	add_task_log($task, $lang->task_bankpipe_ran);
+    add_task_log($task, $lang->task_bankpipe_ran);
 }

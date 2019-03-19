@@ -11,27 +11,27 @@ class Handler
 
     protected $orderId;
 
-	public function __construct(string $orderId = '')
-	{
-		$this->traitConstruct();
+    public function __construct(string $orderId = '')
+    {
+        $this->traitConstruct();
 
-		if ($orderId) {
-		    $this->orderId = $orderId;
+        if ($orderId) {
+            $this->orderId = $orderId;
         }
-	}
+    }
 
-	public function save(array $data)
-	{
-		$insert = [
-			'uid' => (int) $this->mybb->user['uid'],
-			'date' => TIME_NOW
-		];
+    public function save(array $data)
+    {
+        $insert = [
+            'uid' => (int) $this->mybb->user['uid'],
+            'date' => TIME_NOW
+        ];
 
-		if ($this->orderId) {
-    		$insert['invoice'] = $this->orderId;
-		}
+        if ($this->orderId) {
+            $insert['invoice'] = $this->orderId;
+        }
 
-		$insert = array_merge($insert, $data);
+        $insert = array_merge($insert, $data);
 
         $toSanitize = ['message', 'invoice'];
         foreach ($toSanitize as $field) {
@@ -42,18 +42,18 @@ class Handler
 
         }
 
-		// Convert arrays to strings
-		$toString = ['bids', 'discounts'];
-		foreach ($toString as $key) {
+        // Convert arrays to strings
+        $toString = ['bids', 'discounts'];
+        foreach ($toString as $key) {
 
-    		if (is_array($insert[$key])) {
-        		$insert[$key] = implode('|', Core::normalizeArray($insert[$key]));
-    		}
+            if (is_array($insert[$key])) {
+                $insert[$key] = implode('|', Core::normalizeArray($insert[$key]));
+            }
 
-		}
+        }
 
         $insert = $this->plugins->run_hooks('bankpipe_log', $insert);
 
-		return $this->db->insert_query('bankpipe_log', $insert);
-	}
+        return $this->db->insert_query('bankpipe_log', $insert);
+    }
 }

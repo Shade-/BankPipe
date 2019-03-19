@@ -26,8 +26,8 @@ class RestCreatePlanRequestTest extends TestCase
                     'type'                  => RestGateway::PAYMENT_REGULAR,
                     'frequency'             => RestGateway::BILLING_PLAN_FREQUENCY_MONTH,
                     'frequency_interval'    => 1,
-	                'cycles'                => 12,
-	                'amount'                => array(
+                    'cycles'                => 12,
+                    'amount'                => array(
                         'value'     => 10.00,
                         'currency'  => 'USD',
                     )

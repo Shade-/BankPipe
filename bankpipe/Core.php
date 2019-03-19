@@ -15,22 +15,22 @@ use BankPipe\Messages\Handler as Messages;
 
 class Core implements GatewayInterface
 {
-	use Helper\MybbTrait;
+    use Helper\MybbTrait;
 
-	protected $gatewayName;
-	protected $orderId;
+    protected $gatewayName;
+    protected $orderId;
 
-	public function __construct()
-	{
-		$this->traitConstruct();
+    public function __construct()
+    {
+        $this->traitConstruct();
 
-		$this->orderId = $this->mybb->input['orderId'] ?? uniqid();
-		$this->orders = new Orders;
-		$this->items = new Items;
-		$this->log = new Logs($this->orderId);
-		$this->cookies = new Cookies;
-		$this->notifications = new Notifications;
-		$this->messages = new Messages;
+        $this->orderId = $this->mybb->input['orderId'] ?? uniqid();
+        $this->orders = new Orders;
+        $this->items = new Items;
+        $this->log = new Logs($this->orderId);
+        $this->cookies = new Cookies;
+        $this->notifications = new Notifications;
+        $this->messages = new Messages;
     }
 
     /**
@@ -47,9 +47,9 @@ class Core implements GatewayInterface
         try {
 
             $response = $this->gateway
-            	->purchase($parameters)
-            	->setItems($items)
-            	->send();
+                ->purchase($parameters)
+                ->setItems($items)
+                ->send();
 
         }
         catch (\Exception $e) {
@@ -58,16 +58,16 @@ class Core implements GatewayInterface
 
         $parameters['type'] = Orders::CREATE;
 
-		// If preparation is successful, insert the preliminary order (will be authorized or destroyed in the complete() method)
-		$bids = $this->orders->insert($items, $this->orderId, $parameters);
+        // If preparation is successful, insert the preliminary order (will be authorized or destroyed in the complete() method)
+        $bids = $this->orders->insert($items, $this->orderId, $parameters);
 
-		$this->log->save([
-    		'type' => Orders::CREATE,
-    		'bids' => $bids
-		]);
+        $this->log->save([
+            'type' => Orders::CREATE,
+            'bids' => $bids
+        ]);
 
-		$args = [&$this, &$items];
-		$this->plugins->run_hooks('bankpipe_core_purchase', $args);
+        $args = [&$this, &$items];
+        $this->plugins->run_hooks('bankpipe_core_purchase', $args);
 
         return $response;
     }
@@ -82,24 +82,24 @@ class Core implements GatewayInterface
     public function complete(array $parameters)
     {
         if (!$this->orderId) {
-		    $this->messages->error($this->lang->bankpipe_error_order_not_found);
-	    }
+            $this->messages->error($this->lang->bankpipe_error_order_not_found);
+        }
 
-	    $order = reset($this->orders->get([
-	        'invoice' => $this->orderId
+        $order = reset($this->orders->get([
+            'invoice' => $this->orderId
         ]));
 
-	    if (!$order) {
-		    $this->messages->error($this->lang->bankpipe_error_order_not_found);
-	    }
+        if (!$order) {
+            $this->messages->error($this->lang->bankpipe_error_order_not_found);
+        }
 
-	    $parameters = array_merge([
-	        'amount' => $order['total'],
-	        'returnUrl' => $this->getReturnUrl(),
-	        'cancelUrl' => $this->getCancelUrl()
-	    ], $parameters);
+        $parameters = array_merge([
+            'amount' => $order['total'],
+            'returnUrl' => $this->getReturnUrl(),
+            'cancelUrl' => $this->getCancelUrl()
+        ], $parameters);
 
-	    // Complete purchase on gateway's side
+        // Complete purchase on gateway's side
         $response = $this->gateway
             ->completePurchase($parameters)
             ->send();
@@ -132,15 +132,15 @@ class Core implements GatewayInterface
                         $update['usergroup'] = (int) $item['gid'];
                         $update['displaygroup'] = 0; // Use primary
 
-            		}
-            		else {
+                    }
+                    else {
 
-            			// Check if the new gid is already present and eventually add it
-            			if (!in_array($item['gid'], $additionalGroups)) {
-            				$additionalGroups[] = $item['gid'];
-            			}
+                        // Check if the new gid is already present and eventually add it
+                        if (!in_array($item['gid'], $additionalGroups)) {
+                            $additionalGroups[] = $item['gid'];
+                        }
 
-            		}
+                    }
 
                     $update['additionalgroups'] = $additionalGroups;
 
@@ -153,23 +153,23 @@ class Core implements GatewayInterface
             }
 
             if ($update) {
-    		    $this->db->update_query('users', $update, "uid = '" . (int) $this->mybb->user['uid'] . "'");
+                $this->db->update_query('users', $update, "uid = '" . (int) $this->mybb->user['uid'] . "'");
             }
 
             // Wipe cart cookies
-    		if ($this->mybb->settings['bankpipe_cart_mode'] and $this->mybb->cookies['bankpipe-items']) {
-    			$this->cookies->destroy('items');
-    		}
+            if ($this->mybb->settings['bankpipe_cart_mode'] and $this->mybb->cookies['bankpipe-items']) {
+                $this->cookies->destroy('items');
+            }
 
-    		// Wipe discount cookies
-    		if ($this->mybb->cookies['bankpipe-discounts']) {
-    			$this->cookies->destroy('discounts');
-    		}
+            // Wipe discount cookies
+            if ($this->mybb->cookies['bankpipe-discounts']) {
+                $this->cookies->destroy('discounts');
+            }
 
-    		$this->log->save([
-        		'type' => Orders::SUCCESS,
-        		'bids' => $bids
-    		]);
+            $this->log->save([
+                'type' => Orders::SUCCESS,
+                'bids' => $bids
+            ]);
 
         }
         // Unsuccessful, delete
@@ -177,14 +177,14 @@ class Core implements GatewayInterface
 
             $this->orders->destroy($this->orderId);
 
-    		$this->log->save([
-        		'type' => Orders::CANCEL
-    		]);
+            $this->log->save([
+                'type' => Orders::CANCEL
+            ]);
 
         }
 
-		$args = [&$this, &$order];
-		$this->plugins->run_hooks('bankpipe_core_complete', $args);
+        $args = [&$this, &$order];
+        $this->plugins->run_hooks('bankpipe_core_complete', $args);
 
         return [
             'response' => $response,
@@ -227,46 +227,46 @@ class Core implements GatewayInterface
         return $this->orderId;
     }
 
-	static public function filterPrice(string $price)
-	{
-		return number_format((float) filter_var(str_replace(',', '.', $price), FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION), 2);
-	}
+    static public function filterPrice(string $price)
+    {
+        return number_format((float) filter_var(str_replace(',', '.', $price), FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION), 2);
+    }
 
     static public function normalizeArray(array $array)
-	{
-    	return array_filter(array_unique($array));
-	}
+    {
+        return array_filter(array_unique($array));
+    }
 
-	static public function friendlyCurrency(string $currency)
-	{
-    	$currencies = [
-			'AUD' => 'AU&#36;',
-			'BRL' => 'R&#36;',
-			'CAD' => '&#36;',
-			'CZK' => 'Kč',
-			'DKK' => 'kr.',
-			'EUR' => '&#8364;',
-			'HKD' => '&#36;',
-			'HUF' => 'Ft',
-			'INR' => 'Rupees',
-			'ILS' => '&#8362;',
-			'JPY' => '&#165;',
-			'MYR' => 'RM',
-			'MXN' => '&#36;',
-			'TWD' => 'NT&#36;',
-			'NZD' => '&#36;',
-			'NOK' => 'kr',
-			'PHP' => '&#8369;',
-			'PLN' => 'zł',
-			'GBP' => '&#163;',
-			'RUB' => '&#8381;',
-			'SGD' => '&#36;',
-			'SEK' => 'kr',
-			'CHF' => 'CHF',
-			'THB' => '&#3647;',
-			'USD' => '&#36;'
-		];
+    static public function friendlyCurrency(string $currency)
+    {
+        $currencies = [
+            'AUD' => 'AU&#36;',
+            'BRL' => 'R&#36;',
+            'CAD' => '&#36;',
+            'CZK' => 'Kč',
+            'DKK' => 'kr.',
+            'EUR' => '&#8364;',
+            'HKD' => '&#36;',
+            'HUF' => 'Ft',
+            'INR' => 'Rupees',
+            'ILS' => '&#8362;',
+            'JPY' => '&#165;',
+            'MYR' => 'RM',
+            'MXN' => '&#36;',
+            'TWD' => 'NT&#36;',
+            'NZD' => '&#36;',
+            'NOK' => 'kr',
+            'PHP' => '&#8369;',
+            'PLN' => 'zł',
+            'GBP' => '&#163;',
+            'RUB' => '&#8381;',
+            'SGD' => '&#36;',
+            'SEK' => 'kr',
+            'CHF' => 'CHF',
+            'THB' => '&#3647;',
+            'USD' => '&#36;'
+        ];
 
-		return ($currencies[$currency]) ? $currencies[$currency] : false;
-	}
+        return ($currencies[$currency]) ? $currencies[$currency] : false;
+    }
 }

@@ -340,20 +340,21 @@
     },
     {
         "name": "moneyphp/money",
-        "version": "v3.2.0",
-        "version_normalized": "3.2.0.0",
+        "version": "v3.2.1",
+        "version_normalized": "3.2.1.0",
         "source": {
             "type": "git",
             "url": "https://github.com/moneyphp/money.git",
-            "reference": "53ce6e4b9a2aac6e5194a0a633b7a556a6b04b07"
+            "reference": "f6085de6c565e98d2f9a7311a605987b54e06d5e"
         },
         "dist": {
             "type": "zip",
-            "url": "https://api.github.com/repos/moneyphp/money/zipball/53ce6e4b9a2aac6e5194a0a633b7a556a6b04b07",
-            "reference": "53ce6e4b9a2aac6e5194a0a633b7a556a6b04b07",
+            "url": "https://api.github.com/repos/moneyphp/money/zipball/f6085de6c565e98d2f9a7311a605987b54e06d5e",
+            "reference": "f6085de6c565e98d2f9a7311a605987b54e06d5e",
             "shasum": ""
         },
         "require": {
+            "ext-json": "*",
             "php": ">=5.6"
         },
         "require-dev": {
@@ -381,7 +382,7 @@
             "florianv/swap": "Exchange rates library for PHP",
             "psr/cache-implementation": "Used for Currency caching"
         },
-        "time": "2018-12-05T12:17:01+00:00",
+        "time": "2019-02-07T18:01:35+00:00",
         "type": "library",
         "extra": {
             "branch-alias": {
@@ -569,17 +570,17 @@
     },
     {
         "name": "php-http/discovery",
-        "version": "1.6.0",
-        "version_normalized": "1.6.0.0",
+        "version": "1.6.1",
+        "version_normalized": "1.6.1.0",
         "source": {
             "type": "git",
             "url": "https://github.com/php-http/discovery.git",
-            "reference": "02b7ea21eafa0757af04140890a67d8ed45f83b2"
+            "reference": "684855f2c2e9d0a61868b8f8d6bd0295c8a4b651"
         },
         "dist": {
             "type": "zip",
-            "url": "https://api.github.com/repos/php-http/discovery/zipball/02b7ea21eafa0757af04140890a67d8ed45f83b2",
-            "reference": "02b7ea21eafa0757af04140890a67d8ed45f83b2",
+            "url": "https://api.github.com/repos/php-http/discovery/zipball/684855f2c2e9d0a61868b8f8d6bd0295c8a4b651",
+            "reference": "684855f2c2e9d0a61868b8f8d6bd0295c8a4b651",
             "shasum": ""
         },
         "require": {
@@ -598,7 +599,7 @@
             "php-http/message": "Allow to use Guzzle, Diactoros or Slim Framework factories",
             "puli/composer-plugin": "Sets up Puli which is recommended for Discovery to work. Check http://docs.php-http.org/en/latest/discovery.html for more details."
         },
-        "time": "2019-01-23T12:41:22+00:00",
+        "time": "2019-02-23T07:42:53+00:00",
         "type": "library",
         "extra": {
             "branch-alias": {
@@ -1027,17 +1028,17 @@
     },
     {
         "name": "symfony/http-foundation",
-        "version": "v4.2.2",
-        "version_normalized": "4.2.2.0",
+        "version": "v4.2.4",
+        "version_normalized": "4.2.4.0",
         "source": {
             "type": "git",
             "url": "https://github.com/symfony/http-foundation.git",
-            "reference": "a633d422a09242064ba24e44a6e1494c5126de86"
+            "reference": "850a667d6254ccf6c61d853407b16f21c4579c77"
         },
         "dist": {
             "type": "zip",
-            "url": "https://api.github.com/repos/symfony/http-foundation/zipball/a633d422a09242064ba24e44a6e1494c5126de86",
-            "reference": "a633d422a09242064ba24e44a6e1494c5126de86",
+            "url": "https://api.github.com/repos/symfony/http-foundation/zipball/850a667d6254ccf6c61d853407b16f21c4579c77",
+            "reference": "850a667d6254ccf6c61d853407b16f21c4579c77",
             "shasum": ""
         },
         "require": {
@@ -1048,7 +1049,7 @@
             "predis/predis": "~1.0",
             "symfony/expression-language": "~3.4|~4.0"
         },
-        "time": "2019-01-05T16:37:49+00:00",
+        "time": "2019-02-26T08:03:39+00:00",
         "type": "library",
         "extra": {
             "branch-alias": {
