@@ -55,7 +55,7 @@ class Manage extends Usercp
                     $price = Core::filterPrice($price);
                     $oldprice = Core::filterPrice($olditems[$bid]);
 
-                    if ($price == $oldprice) {
+                    if ($price == $oldprice and $price > 0) {
                         continue;
                     }
 
@@ -78,7 +78,7 @@ class Manage extends Usercp
             }
 
             redirect(
-                'usercp.php?action=manage',
+                'usercp.php?action=manage&env=bankpipe',
                 $this->lang->bankpipe_success_settings_edited_desc,
                 $this->lang->bankpipe_success_settings_edited
             );
@@ -88,7 +88,7 @@ class Manage extends Usercp
         $this->plugins->run_hooks('bankpipe_ucp_manage_start', $this);
 
         add_breadcrumb($this->lang->bankpipe_nav, 'usercp.php');
-        add_breadcrumb($this->lang->bankpipe_nav_purchases, 'usercp.php?action=manage');
+        add_breadcrumb($this->lang->bankpipe_nav_purchases, 'usercp.php?action=manage&env=bankpipe');
 
         $query = $this->db->simple_select('bankpipe_items', 'COUNT(bid) AS total', 'uid = ' . $uid);
         $totalItems = $this->db->fetch_field($query, 'total');
@@ -114,7 +114,7 @@ class Manage extends Usercp
             $page = 1;
         }
 
-        $multipage = multipage($totalItems, $perpage, $page, 'usercp.php?action=bankpipe-manage');
+        $multipage = multipage($totalItems, $perpage, $page, 'usercp.php?action=manage&env=bankpipe');
 
         $items = '';
 

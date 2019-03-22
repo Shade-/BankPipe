@@ -932,7 +932,7 @@ function bankpipe_update_paid_attachment($args)
 
 function bankpipe_attachments_postbit($data)
 {
-    global $templates, $currentAttachment, $attachcache, $orders, $plugins, $payments, $items, $cookies;
+    global $mybb, $templates, $currentAttachment, $attachcache, $orders, $plugins, $payments, $items, $cookies;
 
     if (!$orders) {
         $orders = new Orders;
