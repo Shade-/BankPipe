@@ -2,7 +2,7 @@
 
 namespace BankPipe\Admin;
 
-class DownloadLogs
+class Downloadlogs
 {
     use \BankPipe\Helper\MybbTrait;
 

@@ -6,7 +6,7 @@ use BankPipe\Items\Items;
 use BankPipe\Items\Orders;
 use BankPipe\Logs\Handler as Logs;
 
-class SubscribeUsers
+class Subscribeusers
 {
     use \BankPipe\Helper\MybbTrait;
 
