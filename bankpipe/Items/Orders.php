@@ -19,6 +19,8 @@ class Orders
     const REFUND = 5;
     const MANUAL = 6;
     const CANCEL = 7;
+    const UNRESOLVED = 8;
+    const UNDERPAID = 9;
 
     public function __construct()
     {
@@ -27,114 +29,84 @@ class Orders
         $this->permissions = new Permissions;
     }
 
-    public function insert(array $items, string $orderId, array $settings = [])
+    public function insert(array $orders, string $orderId, array $settings = [])
     {
-        if (!$items or !$orderId) {
+        if (!$orders or !$orderId) {
             return false;
         }
 
-        $discounts = $order = $bids = $merchants = [];
+        $validatedOrders = $bids = [];
 
-        // Extract discounts
-        $dids = Core::normalizeArray(array_column($items, 'did'));
-        $query = $this->db->simple_select('bankpipe_discounts', '*', "did IN ('" . implode("','", $dids) . "')");
-        while ($discount = $this->db->fetch_array($query)) {
-            $discounts[] = $discount;
-        }
+        // Loop through this order
+        foreach ($orders as $key => $order) {
 
-        // Loop through this order items
-        foreach ($items as $key => $item) {
-
-            // We want only registered items, not discounts or other garbage
-            if (!$item['bid']) {
+            // We want only validated items, not garbage
+            if (!$order['bid']) {
                 continue;
             }
 
-            $price = $item['price'];
-            $dids = [];
+            $validatedDiscounts = [];
 
-            // Check and apply discounts
-            if ($discounts) {
+            $price = $order['price'];
 
-                foreach ($discounts as $discount) {
+            // Subtract discounts 
+            if ($settings['discounts'][$order['bid']]) {
 
-                    if (!$this->permissions->discountCheck($discount, $item)) {
-                        continue;
-                    }
+                foreach ($settings['discounts'][$order['bid']] as $discount) {
 
-                    // Percentage
-                    if ($discount['type'] == 1) {
-                        $price = $price - ($price * $discount['value'] / 100);
-                    }
-                    // Absolute
-                    else {
-                        $price = $price - $discount['value'];
-                    }
-
-                    $dids[] = $discount['did'];
+                    $price += $discount['amount'];
+                    $validatedDiscounts[] = $discount['id'];
 
                 }
 
             }
 
-            $order[$key] = [
+            $validatedOrders[$key] = [
                 'invoice' => $this->db->escape_string($orderId),
                 'price' => Core::filterPrice($price),
                 'uid' => $this->mybb->user['uid'],
-                'bid' => (int) $item['bid'],
-                'oldgid' => (int) $item['oldgid'],
-                'newgid' => (int) $item['newgid'],
-                'expires' => (int) $item['expires'],
+                'bid' => (int) $order['bid'],
+                'oldgid' => (int) $order['oldgid'],
+                'newgid' => (int) $order['newgid'],
+                'expires' => (int) $order['expires'],
+                'currency' => $this->db->escape_string($settings['currency']),
                 'date' => TIME_NOW,
-                'active' => 0,
-                'discounts' => implode('|', Core::normalizeArray($dids))
+                'active' => 0
             ];
 
             if ($settings['type'] and is_int($settings['type'])) {
-                $order[$key]['type'] = (int) $settings['type'];
+                $validatedOrders[$key]['type'] = (int) $settings['type'];
             }
 
             // Reference?
             if ($settings['reference']) {
-                $order[$key]['payment_id'] = $this->db->escape_string($settings['reference']);
+                $validatedOrders[$key]['payment_id'] = $this->db->escape_string($settings['reference']);
             }
 
-            // Look for a third party merchant and associate it with this payment
+            // Associate merchant with this payment
+            if ($settings['wallet']) {
+                $validatedOrders[$key]['wallet'] = $settings['wallet'];
+            }
+
             if ($settings['merchant']) {
+                $validatedOrders[$key]['merchant'] = $settings['merchant'];
+            }
 
-                $merchant = $this->db->escape_string($settings['merchant']);
-
-                // TO-DO: cache merchants properly
-                if (!$merchants[$merchant]) {
-
-                    $query = $this->db->simple_select(
-                        'users',
-                        'uid',
-                        "payee = '" . $merchant . "'"
-                    );
-                    $uid = $this->db->fetch_field($query, 'uid');
-
-                    if ($uid) {
-                        $merchants[$merchant] = $uid;
-                    }
-
-                }
-
-                $order[$key]['payee'] = $merchants[$merchant];
-                $order[$key]['payee_email'] = $merchant;
-
+            // Add discounts
+            if ($validatedDiscounts) {
+                $validatedOrders[$key]['discounts'] = implode('|', Core::normalizeArray($validatedDiscounts));
             }
 
         }
 
-        $args = [&$this, &$order];
+        $args = [&$this, &$validatedOrders];
         $this->plugins->run_hooks('bankpipe_orders_insert', $args);
 
-        if ($order) {
-            $this->db->insert_query_multiple(Items::PAYMENTS_TABLE, $order);
+        if ($validatedOrders) {
+            $this->db->insert_query_multiple(Items::PAYMENTS_TABLE, array_values($validatedOrders));
         }
 
-        return Core::normalizeArray(array_column($order, 'bid'));
+        return Core::normalizeArray(array_column($validatedOrders, 'bid'));
     }
 
     public function get(array $search, array $options = [])
@@ -143,18 +115,26 @@ class Orders
 
         $options['group_by'] = $options['group_by'] ?? 'invoice';
 
-        $query = $this->getQuery($search, '*, GROUP_CONCAT(bid, \'|\', price, \'|\', pid) concat', $options);
+        switch ($this->db->type) {
+            case 'pgsql':
+                $options['group_by'] .= ', pid, price, bid';
+                $query = $this->getQuery($search, '*, STRING_AGG(bid || \'|\' || price || \'|\' || pid, \',\') AS concat', $options);
+                break;
+            default:
+                $query = $this->getQuery($search, '*, GROUP_CONCAT(bid, \'|\', price, \'|\', pid) concat', $options);
+                break;
+        }
         while ($item = $this->db->fetch_array($query)) {
 
             $item = $this->plugins->run_hooks('bankpipe_orders_get_item', $item);
 
-            $item['merchant'] = $item['payee'];
             $item['buyer'] = $item['uid'];
             $item['discounts'] = explode('|', $item['discounts']);
             $specificFeatures = explode(',', $item['concat']);
 
-            unset($item['payee'], $item['uid'], $item['concat'], $item['bid'], $item['pid'], $item['price']);
+            unset($item['uid'], $item['concat'], $item['bid'], $item['pid'], $item['price']);
 
+            $item['currency_code'] = $item['currency'];
             $item['currency'] = Core::friendlyCurrency($item['currency']);
 
             $return[$item['invoice']] = $item;
@@ -241,7 +221,7 @@ class Orders
             else if (is_array($value)) {
                 $search[] = $column . " IN ('" . implode("','", $value) . "')";
             }
-            else if (is_int($value)) {
+            else {
                 $search[] = $column . " = '" . $value . "'";
             }
 

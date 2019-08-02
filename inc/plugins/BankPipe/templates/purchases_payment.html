@@ -13,7 +13,7 @@
 						<thead>
 							<tr>
 								<td class="thead" colspan="2">
-									<strong>{$this->lang->bankpipe_purchases_payment_transaction}{$order['payment_id']}</strong>
+									<strong>{$this->lang->bankpipe_purchases_payment_transaction} {$order['payment_id']}</strong>
 								</td>
 							</tr>
 						</thead>
@@ -38,6 +38,7 @@
 											<th class="tcat">{$this->lang->bankpipe_purchases_payment_item}</th>
 											<th class="tcat" align="center">{$this->lang->bankpipe_purchases_payment_cost}</th>
 										</tr>
+										{$pending}
 										{$items}
 										<tr>
 											<td class="trow2" align="right"><b>{$this->lang->bankpipe_purchases_payment_total}</b></td>

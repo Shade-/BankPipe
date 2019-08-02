@@ -4,11 +4,9 @@
 		<div class="smalltext">{$subscription['htmldescription']}</div>
 	</td>
 	<td class="trow1" align="center">
-		{$price}
+		{$subscription['price']}{$currency}
 	</td>
 	<td class="trow1" align="center">
-		<a href="#" class="purchase button" data-items="{$subscription['bid']}">
-    		{$this->lang->bankpipe_buy_now}
-		</a>
+		<a href="usercp.php?action=cart&env=bankpipe&add=1&bid={$subscription['bid']}" class="button bankpipe-item" data-action="add" data-aid="{$subscription['bid']}">{$this->lang->bankpipe_add_to_cart}</a>
 	</td>
 </tr>

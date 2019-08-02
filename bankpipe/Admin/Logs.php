@@ -62,14 +62,28 @@ class Logs
 
         $logs = $search = $toDelete = [];
 
-        $query = $this->db->query('
-            SELECT l.*, u.username, u.usergroup, u.displaygroup, u.avatar, GROUP_CONCAT(l.type, \'|\', l.date ORDER BY l.date DESC) types
-            FROM ' . TABLE_PREFIX . 'bankpipe_log l
-            LEFT JOIN ' . TABLE_PREFIX . 'users u ON (u.uid = l.uid)
-            GROUP BY l.invoice
-            ORDER BY l.date DESC
-            LIMIT ' . (int) $start . ', ' . (int) $perpage . '
-        ');
+        switch ($this->db->type) {
+            case 'pgsql':
+                $query = $this->db->query('
+                    SELECT l.*, u.username, u.usergroup, u.displaygroup, u.avatar, STRING_AGG(l.type || \'|\' || l.date, \',\' ORDER BY l.date DESC) AS types
+                    FROM ' . TABLE_PREFIX . 'bankpipe_log l
+                    LEFT JOIN ' . TABLE_PREFIX . 'users u ON (u.uid = l.uid)
+                    GROUP BY l.lid, l.invoice, u.username, u.usergroup, u.displaygroup, u.avatar
+                    ORDER BY l.date DESC
+                    LIMIT ' . (int) $start . ', ' . (int) $perpage . '
+                ');
+                break;
+            default:
+                $query = $this->db->query('
+                    SELECT l.*, u.username, u.usergroup, u.displaygroup, u.avatar, GROUP_CONCAT(l.type, \'|\', l.date ORDER BY l.date DESC) types
+                    FROM ' . TABLE_PREFIX . 'bankpipe_log l
+                    LEFT JOIN ' . TABLE_PREFIX . 'users u ON (u.uid = l.uid)
+                    GROUP BY l.invoice
+                    ORDER BY l.date DESC
+                    LIMIT ' . (int) $start . ', ' . (int) $perpage . '
+                ');
+                break;
+        }
         while ($log = $this->db->fetch_array($query)) {
 
             if (!$log['invoice']) {

@@ -309,12 +309,148 @@ email=Email",
 
         }
 
+        // beta 7
+        if (version_compare($this->oldVersion, 'beta 7', "<")) {
+
+            if (!$this->db->table_exists('bankpipe_wallets')) {
+
+                $collation = $this->db->build_create_table_collation();
+
+                $this->db->write_query("
+                CREATE TABLE " . TABLE_PREFIX . "bankpipe_wallets (
+                    uid int(10) NOT NULL PRIMARY KEY
+                ) ENGINE=MyISAM{$collation};
+                ");
+
+            }
+
+            if (!$this->db->table_exists('bankpipe_gateways')) {
+
+                $collation = $this->db->build_create_table_collation();
+
+                $this->db->write_query("
+                CREATE TABLE " . TABLE_PREFIX . "bankpipe_gateways (
+                    gid int(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    enabled tinyint(1) DEFAULT 0,
+                    name varchar(255) DEFAULT '',
+                    id varchar(255) DEFAULT '',
+                    secret varchar(255) DEFAULT '',
+                    wallet varchar(255) DEFAULT '',
+                    sandbox tinyint(1) DEFAULT 0
+                ) ENGINE=MyISAM{$collation};
+                ");
+
+            }
+
+            if ($this->db->field_exists('payee', 'bankpipe_payments')) {
+                $this->db->rename_column('bankpipe_payments', 'payee', 'merchant', "int(10) NOT NULL DEFAULT '0'");
+            }
+
+            if ($this->db->field_exists('payee_email', 'bankpipe_payments')) {
+                $this->db->rename_column('bankpipe_payments', 'payee_email', 'wallet', "text");
+            }
+
+            // Add crypto fields
+            if (!$this->db->field_exists('crypto_price', 'bankpipe_payments')) {
+                $this->db->add_column('bankpipe_payments', 'crypto_price', "decimal(28,17) after `currency`");
+            }
+
+            if (!$this->db->field_exists('crypto_currency', 'bankpipe_payments')) {
+                $this->db->add_column('bankpipe_payments', 'crypto_currency', "varchar(3) after `crypto_price`");
+            }
+
+            // Add PayPal fields
+            if (!$this->db->field_exists('PayPal', 'bankpipe_wallets')) {
+                $this->db->add_column('bankpipe_wallets', 'PayPal', "varchar(255) DEFAULT ''");
+            }
+
+            // Rename email -> PayPal
+            if ($this->db->field_exists('email', 'bankpipe_items')) {
+                $this->db->rename_column('bankpipe_items', 'email', 'PayPal', "varchar(255) DEFAULT ''");
+            }
+
+            // Change value definition
+            if ($this->db->field_exists('value', 'bankpipe_discounts')) {
+                $this->db->rename_column('bankpipe_discounts', 'value', 'value', "decimal(6,2) NOT NULL");
+            }
+
+            // Populate wallets
+            if ($this->db->field_exists('payee', 'users')) {
+
+                $insert = [];
+                $query = $this->db->simple_select('users', 'uid, payee', "payee <> ''");
+                while ($merchant = $this->db->fetch_array($query)) {
+
+                    $insert[] = [
+                        'uid' => $merchant['uid'],
+                        'PayPal' => $merchant['payee']
+                    ];
+
+                }
+
+                if ($insert) {
+                    $this->db->insert_query_multiple('bankpipe_wallets', $insert);
+                }
+
+                // Safely delete payee
+                $this->db->drop_column('users', 'payee');
+
+            }
+
+            // Populate gateways table
+            $insert = [
+                [
+                    'enabled' => 1,
+                    'name' => 'PayPal',
+                    'id' => $this->db->escape_string($this->mybb->settings['bankpipe_client_id']),
+                    'secret' => $this->db->escape_string($this->mybb->settings['bankpipe_client_secret']),
+                    'wallet' => $this->db->escape_string($this->mybb->settings['bankpipe_subscription_payee']),
+                    'sandbox' => 0
+                ],
+                [
+                    'enabled' => 0,
+                    'name' => 'Coinbase',
+                    'id' => '',
+                    'secret' => '',
+                    'wallet' => '',
+                    'sandbox' => 0
+                ]
+            ];
+
+            if ($this->mybb->settings['bankpipe_sandbox']) {
+                $insert[0]['sandbox'] = 1;
+            }
+
+            $this->db->insert_query_multiple('bankpipe_gateways', $insert);
+
+            // Drop settings we don't use anymore
+            $dropSettings[] = 'client_id';
+            $dropSettings[] = 'client_secret';
+            $dropSettings[] = 'subscription_payee';
+            $dropSettings[] = 'sandbox';
+            $dropSettings[] = 'cart_mode';
+
+            // Add settings
+            $newSettings[] = [
+                "name" => "bankpipe_pending_payments_cleanup",
+                "title" => $this->db->escape_string($this->lang->setting_bankpipe_bankpipe_pending_payments_cleanup),
+                "description" => $this->db->escape_string($this->lang->setting_bankpipe_bankpipe_pending_payments_cleanup_desc),
+                "optionscode" => "text",
+                "value" => '7',
+                "disporder" => 20,
+                "gid" => $gid
+            ];
+
+            $updateTemplates = 1;
+
+        }
+
         if ($newSettings) {
             $this->db->insert_query_multiple('settings', $newSettings);
         }
 
         if ($dropSettings) {
-            $this->db->delete_query('settings', "name IN ('bankpipe_". implode("','bankpipe_", $dropSettings) ."')");
+            $this->db->delete_query('settings', "name IN ('bankpipe_" . implode("','bankpipe_", $dropSettings) . "')");
         }
 
         rebuild_settings();

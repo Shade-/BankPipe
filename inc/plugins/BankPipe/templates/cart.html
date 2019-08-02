@@ -17,7 +17,7 @@
 							</tr>
 							{$discountArea}
 							<tr>
-								<td class="tcat">{$this->lang->bankpipe_cart_header_attachment}</td>
+								<td class="tcat">{$this->lang->bankpipe_cart_header_item}</td>
 								<td class="tcat" align="center">{$this->lang->bankpipe_cart_header_cost}</td>
 								<td class="tcat" align="center">{$this->lang->bankpipe_cart_header_discount}</td>
 							</tr>
@@ -27,8 +27,17 @@
 							{$total}
 						</tbody>
 					</table>
-					<div style="text-align: center; margin: 20px 0" class="buy-area">
-						<a href="#" class="button purchase">{$this->lang->bankpipe_buy_now}</a>
+					<br>
+					<table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder" style="max-width: 500px; margin: auto">
+						<thead>
+							<tr>
+								<td class="thead" colspan="2"><strong>{$this->lang->bankpipe_payment_methods}</strong></td>
+							</tr>
+						</thead>
+						<tbody>
+							{$buyButtons}
+						</tbody>
+					</table>
 					</div>
 				</td>
 			</tr>

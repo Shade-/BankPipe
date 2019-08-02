@@ -20,7 +20,7 @@ class Cookies
 
     public function write(string $name, array $data = [])
     {
-        return my_setcookie('bankpipe-' . $name, json_encode(array_values(array_unique($data))));
+        return my_setcookie('bankpipe-' . $name, json_encode(array_unique($data)));
     }
 
     public function destroy(string $name)

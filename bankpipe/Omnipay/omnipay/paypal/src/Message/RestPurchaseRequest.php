@@ -227,20 +227,6 @@ class RestPurchaseRequest extends RestAuthorizeRequest
     {
         $data = parent::getData();
         $data['intent'] = 'sale';
-        
-        $merchant = $this->getMerchant();
-        if ($merchant) {
-            $data['transactions'][0]['payee']['email'] = $merchant;
-        }
-        
         return $data;
-    }
-    
-    public function setMerchant($value) {
-        return $this->setParameter('merchant', $value);
-    }
-    
-    public function getMerchant() {
-        return $this->getParameter('merchant');
     }
 }

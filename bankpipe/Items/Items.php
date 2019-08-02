@@ -148,34 +148,24 @@ class Items
 
     public function insert(array $items)
     {
-        $insert = $update = $toUpdate = [];
-        $allowed = [
-            'uid',
-            'price',
-            'gid',
-            'aid',
-            'email',
-            'name',
-            'description',
-            'htmldescription',
-            'discount',
-            'expires',
-            'primarygroup',
-            'expirygid',
-            'type'
-        ];
+        $insert = $update = $toUpdate = $allowed = [];
 
-        $aids = Core::normalizeArray(array_column($items, 'aid'));
+        $query = $this->db->query('SELECT column_name FROM information_schema.columns WHERE table_name = \'' . TABLE_PREFIX . 'bankpipe_items\'');
+        while ($column = $this->db->fetch_array($query)) {
+            $allowed[] = $column['column_name'];
+        }
 
-        if ($aids) {
+        $bids = Core::normalizeArray(array_column($items, 'bid'));
+
+        if ($bids) {
 
             $query = $this->db->simple_select(
                 self::ITEMS_TABLE,
-                'aid',
-                "aid IN ('" . implode("','", array_map('intval', $aids)) . "')"
+                'bid',
+                "bid IN ('" . implode("','", array_map('intval', $bids)) . "')"
             );
-            while ($aid = $this->db->fetch_field($query, 'aid')) {
-                $toUpdate[] = $aid;
+            while ($bid = $this->db->fetch_field($query, 'bid')) {
+                $toUpdate[] = $bid;
             }
 
         }
@@ -211,8 +201,8 @@ class Items
             }
 
             // Update or insert?
-            if ($item['aid'] and in_array($item['aid'], $toUpdate)) {
-                $this->db->update_query(self::ITEMS_TABLE, $item, "aid = '" . $item['aid'] . "'");
+            if ($item['bid'] and in_array($item['bid'], $toUpdate)) {
+                $this->db->update_query(self::ITEMS_TABLE, $item, "bid = '" . $item['bid'] . "'");
             }
             else {
                 $insert[] = $item;

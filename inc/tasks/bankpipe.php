@@ -1,6 +1,7 @@
 <?php
 
 // Bankpipe Cleanup
+// TO-DO: implement Orders class
 
 function task_bankpipe($task)
 {
@@ -8,9 +9,70 @@ function task_bankpipe($task)
 
     $lang->load('bankpipe');
 
+    // Clean up "CREATE"-type orders. TO-DO: use Orders class. CREATE = 1
+    $db->delete_query('bankpipe_payments', 'type = 1');
+
+    $now = TIME_NOW;
+    $updateMailqueue = false;
+    $deadline = ($mybb->settings['bankpipe_pending_payments_cleanup'])
+        ? (int) $mybb->settings['bankpipe_pending_payments_cleanup']
+        : 7;
+
+    // Delete pending payments older than X days
+    $limit = $now - (60*60*24*$deadline);
+    $toDelete = $uids = $users = $pendingPaymentsToDelete = [];
+
+    $query = $db->simple_select('bankpipe_payments', '*', 'type = 3 AND date < ' . $limit);
+    while ($payment = $db->fetch_array($query)) {
+        $pendingPaymentsToDelete[] = $payment;
+        $uids[] = $payment['uid'];
+    }
+
+    if ($uids) {
+
+        $query = $db->simple_select('users', 'uid, email, username, usergroup, displaygroup', 'uid IN (' . implode(',', $uids) . ')');
+        while ($user = $db->fetch_array($query)) {
+            $users[$user['uid']] = $user;
+        }
+
+    }
+
+    foreach ($pendingPaymentsToDelete as $payment) {
+
+        $toDelete[] = $payment['pid'];
+
+        $user = $users[$payment['uid']];
+
+        $username = format_name(htmlspecialchars_uni($user['username']), $user['usergroup'], $user['displaygroup']);
+        $username = build_profile_link($username, $user['uid']);
+
+        // Notify
+        $message = $lang->sprintf(
+            $lang->bankpipe_notification_pending_payment_cancelled,
+            $username,
+            $payment['invoice'],
+            $deadline,
+            $mybb->settings['bbname']
+        );
+
+        $emails[] = [
+            "mailto" => $db->escape_string($user['email']),
+            "mailfrom" => '',
+            "subject" => $db->escape_string($lang->bankpipe_notification_pending_payment_cancelled_title),
+            "message" => $db->escape_string($message),
+            "headers" => ''
+        ];
+
+        $updateMailqueue = true;
+
+    }
+
+    if ($toDelete) {
+        $db->delete_query('bankpipe_payments', 'pid IN (' . implode(',', array_unique($toDelete)) . ')');
+    }
+
     // Get notifications info
     $notifications = $expiryDates = [];
-    $now = TIME_NOW;
 
     $query = $db->simple_select('bankpipe_notifications', '*', '', ['order_by' => 'daysbefore DESC']);
     while ($notification = $db->fetch_array($query)) {
@@ -43,7 +105,6 @@ function task_bankpipe($task)
     $subscriptions = $uids = [];
 
     // Process expiring subscriptions
-    // TO-DO: use the Orders class
     $query = $db->simple_select('bankpipe_payments', '*', 'active = 1 AND expires > 0' . $where, ['order_by' => 'expires ASC']);
     while ($subscription = $db->fetch_array($query)) {
 
@@ -62,13 +123,11 @@ function task_bankpipe($task)
             $items[$item['bid']] = $item;
         }
 
-        // Get users usernames
+        // Get users data
         $query = $db->simple_select('users', 'uid, username, usergroup, additionalgroups, email, displaygroup', 'uid IN (' . implode(',', $uids) . ')');
         while($user = $db->fetch_array($query)) {
             $users[$user['uid']] = $user;
         }
-
-        $updateMailqueue = false;
 
         // Process
         foreach ($subscriptions as $subscription) {
@@ -212,14 +271,14 @@ function task_bankpipe($task)
 
         }
 
-        if ($emails) {
-            $db->insert_query_multiple("mailqueue", $emails);
-        }
+    }
 
-        if ($updateMailqueue) {
-            $cache->update_mailqueue();
-        }
+    if ($emails) {
+        $db->insert_query_multiple("mailqueue", $emails);
+    }
 
+    if ($updateMailqueue) {
+        $cache->update_mailqueue();
     }
 
     add_task_log($task, $lang->task_bankpipe_ran);

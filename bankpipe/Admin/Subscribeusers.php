@@ -2,6 +2,7 @@
 
 namespace BankPipe\Admin;
 
+use BankPipe\Core;
 use BankPipe\Items\Items;
 use BankPipe\Items\Orders;
 use BankPipe\Logs\Handler as Logs;
@@ -131,7 +132,7 @@ class Subscribeusers
                     }
 
                     $update = [
-                        'additionalgroups' => implode(',', $additionalGroups)
+                        'additionalgroups' => implode(',', Core::normalizeArray($additionalGroups))
                     ];
 
                 }

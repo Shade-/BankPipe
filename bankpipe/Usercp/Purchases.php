@@ -37,10 +37,10 @@ class Purchases extends Usercp
                 $args = [&$this, &$order];
                 $this->plugins->run_hooks('bankpipe_ucp_purchases_payment_start', $args);
 
-                $items = $appliedDiscounts = '';
+                $items = $appliedDiscounts = $pending = '';
 
                 // If no payment id is supplied, ignore this
-                if ($order['payment_id']) {
+                if (in_array($order['type'], [Orders::PENDING, Orders::SUCCESS])) {
 
                     // Set the merchant
                     if ($order['merchant']) {
@@ -80,6 +80,11 @@ class Purchases extends Usercp
                         while ($item = $this->db->fetch_array($query)) {
                             $names[] = ($item['name']) ? $item['name'] : $item['code'];
                         }
+                        
+                        // Previous subscription discount?
+                        if (in_array('p', $discounts)) {
+                            $names[] = $this->lang->bankpipe_purchases_previous_subscription_discount;
+                        }
 
                         $names = implode(', ', $names);
 
@@ -89,6 +94,14 @@ class Purchases extends Usercp
 
                     $args = [&$this, &$order, &$discounts];
                     $this->plugins->run_hooks('bankpipe_ucp_purchases_payment_end', $args);
+
+                    $title = $this->lang->bankpipe_purchases_payment_transaction;
+                    if ($order['type'] == Orders::PENDING) {
+
+                        $title = $this->lang->bankpipe_purchases_payment_transaction_pending;
+                        eval("\$pending = \"".$templates->get("bankpipe_purchases_payment_pending")."\";");
+
+                    }
 
                     eval("\$page = \"".$templates->get("bankpipe_purchases_payment")."\";");
                     output_page($page);
@@ -100,7 +113,7 @@ class Purchases extends Usercp
 
         }
 
-        $purchases = $inactive = $refunded = $expired = '';
+        $purchases = $inactive = $refunded = $expired = $pending = '';
 
         $exclude = [Orders::CREATE, Orders::ERROR, Orders::MANUAL];
         $orders = $ordersHandler->get([
@@ -120,6 +133,9 @@ class Purchases extends Usercp
 
                 if ($order['refund']) {
                     eval("\$refunded .= \"".$templates->get("bankpipe_purchases_purchase_refunded")."\";");
+                }
+                else if ($order['type'] == Orders::PENDING) {
+                    eval("\$pending .= \"".$templates->get("bankpipe_purchases_purchase_pending")."\";");
                 }
                 else if ($order['expires'] and $order['expires'] < TIME_NOW and !$order['active']) {
                     eval("\$expired .= \"".$templates->get("bankpipe_purchases_purchase_expired")."\";");

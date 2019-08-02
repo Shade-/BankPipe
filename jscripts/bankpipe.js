@@ -32,11 +32,12 @@
         },
         currency: 'EUR',
         cartItems: 0,
+        popupClosedAutomatically: false,
+        overlayAnimationSpeed: 350,
 
         init: function(options) {
 
-            BankPipe.options = $.extend({
-            }, options);
+            BankPipe.options = $.extend({}, options);
 
             BankPipe.wrapper = $(BankPipe.elements.wrapper);
             BankPipe.requiredFields = BankPipe.requiredFields.split(',');
@@ -56,22 +57,27 @@
                 'line-height': '100vh',
             });
 
+            // Close overlay on click, just in case it gets stuck
+            overlay.on('click', function(e) {
+                return overlay.fadeOut(BankPipe.overlayAnimationSpeed);
+            });
+
             // Purchase
             $('.purchase').on('click', function(e) {
 
                 e.preventDefault();
 
+                // Reset popup marker
+                BankPipe.popupClosedAutomatically = false;
+
                 var data = {};
 
-                var items = $(this).data('items');
-                if (items) {
-                    data['items'] = items;
-                }
-                else {
-                    data['fromCookies'] = 1;
-                }
+				data.gateway = $(this).data('gateway');
+				if (!data.gateway) {
+					data.gateway = 'Coinbase';
+				}
 
-                overlay.fadeIn(500);
+                overlay.fadeIn(BankPipe.overlayAnimationSpeed);
 
                 if (BankPipe.requiredFields.length) {
 
@@ -88,12 +94,11 @@
 
                 }
 
-                var w;
                 var callback = function(response) {
 
                     // Errors
                     if (response.errors) {
-                        overlay.fadeOut(500);
+                        overlay.fadeOut(BankPipe.overlayAnimationSpeed);
                     }
                     // Success, open window
                     else if (response.url) {
@@ -102,100 +107,47 @@
                         var orderId = response.invoice;
 
                         overlay.text(BankPipe.lang.waitingConfirmation);
-                        w = BankPipe.popup(response.url, '900', '600');
+                        var w = BankPipe.popup(response.url, '900', '700');
 
-                        var iterations = 0;
-                        var promise = new Promise((resolve, reject) => {
+                        // Set up a listening interval to know if the popup is closed or not
+                        var interval = setInterval(function() {
+                            try {
 
-                            var interval = setInterval(function() {
-                                try {
+                                // Popup was closed beforehand, manually
+                                if (w.closed && !BankPipe.popupClosedAutomatically) {
 
-                                    // Popup was closed beforehand
-                                    if (w.closed) {
+                                    // Everything but cryptos? Clear
+                                    if (data.gateway != 'Coinbase') {
 
-                                        // Clear this payment
                                         BankPipe.ajax.request('bankpipe.php?action=cancel&orderId=' + orderId);
-                                        resolve({
-                                            cancelled: 1
-                                        });
-                                        clearInterval(interval);
+
+                                        $.jGrowl(BankPipe.lang.paymentCancelled, {'theme': 'jgrowl_error'});
+
+                                    }
+                                    // Cryptos are marked as "pending" by default. Clear cart and redirect
+                                    else {
+
+                                        $.jGrowl(BankPipe.lang.paymentPending, {'theme': 'jgrowl_success'});
+
+                                        BankPipe.items.clearCart();
+
+                            			if (response.invoice) {
+                            				BankPipe.location.redirect('./usercp.php?action=purchases&env=bankpipe&invoice=' + response.invoice, 3);
+                            			}
 
                                     }
 
-                                    // Popup has switched over our own site, close and process response
-                                    if (w.location.hostname == window.location.hostname) {
+                                    overlay.fadeOut(BankPipe.overlayAnimationSpeed).promise().done(() => {
+                                        return overlay.text(BankPipe.lang.preparingPayment);
+                                    });
 
-                                        if (w.document.body.textContent) {
+                                    clearInterval(interval);
 
-                                            resolve(w.document.body.textContent);
-                                            clearInterval(interval);
-
-                                        }
-                                        else {
-
-                                            // Resolve automatically after 100 iterations = 20 seconds
-                                            if (iterations >= 100) {
-                                                reject('Timed out');
-                                            }
-
-                                            iterations++;
-
-                                        }
-
-                                    }
-
-                                }
-                                catch (err) {} // Blocked frames
-                            }, 50);
-
-                        });
-
-                        promise.then(response => {
-
-                            console.log('raw', response);
-
-                            w.close();
-                            overlay.fadeOut(500).promise().done(() => {
-                                return overlay.text(BankPipe.lang.preparingPayment);
-                            });
-
-                            if (response.constructor !== {}.constructor) {
-
-                                try {
-                                    var response = $.parseJSON(response);
-                                }
-                                catch (e) {
-                                    console.log(e);
-                                    return $.jGrowl(BankPipe.lang.responseMalformed, {'theme': 'jgrowl_error'});
                                 }
 
                             }
-
-                            // Cancelled
-                            if (response.cancelled) {
-                                return $.jGrowl(BankPipe.lang.paymentCancelled, {'theme': 'jgrowl_error'});
-                            }
-                            // Success
-                            else if (response.status == BankPipe.responseStatusCodes.success) {
-
-                                // Show confirmation message
-                                $.jGrowl(BankPipe.lang.paymentSuccessful.replace('{reference}', response.reference), {'theme': 'jgrowl_success'});
-
-                                // Set up a 3 seconds timer to redirect the user to the invoice
-                                if (response.invoice) {
-                                    BankPipe.location.redirect('./usercp.php?action=purchases&env=bankpipe&invoice=' + response.invoice, 3);
-                                }
-
-                            }
-                            // Pending
-                            else if (response.status == BankPipe.responseStatusCodes.pending) {
-                                return $.jGrowl(BankPipe.lang.paymentPending.replace('{reference}', response.reference), {'theme': 'jgrowl_success'});
-                            }
-
-                        }).catch(error => {
-                            overlay.fadeOut(500);
-                            console.log(error);
-                        });
+                            catch (err) {} // Blocked frames
+                        }, 50);
                     }
 
                 };
@@ -228,8 +180,8 @@
                         }
                         else {
 
-                            var aid = btn.data('aid');
-                            var row = $('.item[data-aid="' + aid + '"]');
+                            var bid = btn.data('bid');
+                            var row = $('.item[data-bid="' + bid + '"]');
 
                             if (row.length) {
                                 row.remove();
@@ -366,22 +318,60 @@
             var top = (height - h) / 2 / systemZoom + dualScreenTop;
             var newWindow = window.open(url, '', 'scrollbars=yes, width=' + w / systemZoom + ', height=' + h / systemZoom + ', top=' + top + ', left=' + left);
 
-            // Puts focus on the newWindow
-            if (window.focus) newWindow.focus();
+            // Cannot open due to popup blockers? (eg.: iOS Safari, some ad blockers)
+            if (newWindow == null || typeof(newWindow) == 'undefined') {
+                alert('Please turn off your popup blocker. We are trying to open a secure channel through which you can perform a payment. Thanks!');
+            }
+
+            if (window.focus && newWindow) newWindow.focus();
 
             return newWindow;
+        },
+
+        processPopupMessage: function(response) {
+
+            var overlay = $(BankPipe.elements.overlay);
+
+            overlay.fadeOut(BankPipe.overlayAnimationSpeed).promise().done(() => {
+                return overlay.text(BankPipe.lang.preparingPayment);
+            });
+
+            // Cancelled
+            if (response.cancelled) {
+                return $.jGrowl(BankPipe.lang.paymentCancelled, {'theme': 'jgrowl_error'});
+            }
+            // Success
+            else if (response.status == BankPipe.responseStatusCodes.success) {
+                $.jGrowl(BankPipe.lang.paymentSuccessful.replace('{reference}', response.reference), {'theme': 'jgrowl_success'});
+            }
+            // Pending
+            else if (response.status == BankPipe.responseStatusCodes.pending) {
+                $.jGrowl(BankPipe.lang.paymentPending, {'theme': 'jgrowl_success'});
+            }
+
+			// Set up a 3 seconds timer to redirect the user to the invoice
+			if (response.invoice) {
+				BankPipe.location.redirect('./usercp.php?action=purchases&env=bankpipe&invoice=' + response.invoice, 3);
+			}
         },
 
         items: {
             getCart: function() {
                 var items = BankPipe.cookies.get('items');
                 return (BankPipe.exists(items)) ? JSON.parse(items) : [];
+            },
+            clearCart: function() {
+                BankPipe.cookies.destroy('items');
+                BankPipe.cookies.destroy('discounts');
             }
         },
 
         cookies: {
             get: function(name) {
-                return Cookies.get('bankpipe-' + name);
+                return Cookie.get('bankpipe-' + name);
+            },
+            destroy: function(name) {
+                return Cookie.unset('bankpipe-' + name);
             }
         },
 

@@ -4,21 +4,13 @@
 $l['bankpipe_pluginlibrary_missing'] = "<a href=\"http://mods.mybb.com/view/pluginlibrary\">PluginLibrary</a> is missing. Please install it before doing anything else with bankpipe.";
 
 $l['setting_group_bankpipe'] = "BankPipe Settings";
-$l['setting_group_bankpipe_desc'] = "Manage your BankPipe settings, such as your client tokens, the default merchant and other options.";
-$l['setting_bankpipe_subscription_payee'] = "Default merchant";
-$l['setting_bankpipe_subscription_payee_desc'] = "Enter the email address of the default merchant where money will be sent to. If he does not have a PayPal account yet, he will be asked to create one when he receives his first payment. This is used to create subscriptions from the ACP.";
-$l['setting_bankpipe_client_id'] = "Client ID";
-$l['setting_bankpipe_client_id_desc'] = "Enter your PayPal client ID. If you are using sandbox mode, ensure you add the sandbox client ID.";
-$l['setting_bankpipe_client_secret'] = "Client secret";
-$l['setting_bankpipe_client_secret_desc'] = "Enter your PayPal client secret. If you are using sandbox mode, ensure you add the sandbox client secret.";
-$l['setting_bankpipe_sandbox'] = "Sandbox mode";
-$l['setting_bankpipe_sandbox_desc'] = "Enable this option to use PayPal's sandbox API endpoints. Inside the sandbox, your users do not exchange real money.";
+$l['setting_group_bankpipe_desc'] = "Manage your BankPipe settings, such as the currency, who is allowed to see and manage monetized attachments, notifications, etc..";
 $l['setting_bankpipe_currency'] = "Currency";
 $l['setting_bankpipe_currency_desc'] = "Choose a system-wide currency.";
 $l['setting_bankpipe_usergroups_view'] = "Usergroups allowed to see";
 $l['setting_bankpipe_usergroups_view_desc'] = "Choose what usergroups can see and purchase items and subscriptions. Leave blank to allow everyone.";
 $l['setting_bankpipe_third_party'] = "Third party monetization";
-$l['setting_bankpipe_third_party_desc'] = "Enable this option to allow your users monetize their own attachments and receive money on their personal PayPal account.";
+$l['setting_bankpipe_third_party_desc'] = "Enable this option to allow your users monetize their own attachments and receive money on their personal gateways' wallet.";
 $l['setting_bankpipe_usergroups_manage'] = "Usergroups allowed to manage";
 $l['setting_bankpipe_usergroups_manage_desc'] = "Choose what usergroups can create and manage items. Subscriptions are manageable only by admins through the ACP. Leave blank to allow everyone. Applies if third party monetization option is enabled. Users with ACP access can always manage items, even with third party monetization option disabled.";
 $l['setting_bankpipe_forums'] = "Allowed forums";
@@ -33,10 +25,10 @@ $l['setting_bankpipe_admin_notification_method'] = "Admin notification method";
 $l['setting_bankpipe_admin_notification_method_desc'] = "Choose the notification method for admin notifications.";
 $l['setting_bankpipe_admin_notification_sender'] = "Admin notification sender";
 $l['setting_bankpipe_admin_notification_sender_desc'] = "Enter the uid of the user you want to use as sender for admin notifications by PM. Leave blank to use the MyBB Engine.";
-$l['setting_bankpipe_cart_mode'] = "Cart mode";
-$l['setting_bankpipe_cart_mode_desc'] = "Enable this option to use the built-in cart to stack and purchase multiple items at once. This also allows you to use discounts for attachments. An 'Add to cart' button will be added to paid attachments instead of PayPal's Pay Now button. If this option is disabled, attachments can be purchased instantly without checking out the cart, but you lose the ability to apply discount codes to attachments and you won't be able to purchase multiple attachments at once. Note that discount codes will work for subscriptions no matter how this option is set to.";
 $l['setting_bankpipe_required_fields'] = "Required fields";
 $l['setting_bankpipe_required_fields_desc'] = "Enter a coma-separated list of field names required to be filled before making a purchase through cart and subscriptions pages. Reference these fields with names (eg.: for a field named foo, use for example &lt;input name='foo' type='checkbox' value='1' /&gt;) in bankpipe_cart* and bankpipe_subscriptions* templates.";
+$l['setting_bankpipe_pending_payments_cleanup'] = "Pending payments cleanup";
+$l['setting_bankpipe_pending_payments_cleanup_desc'] = "Enter the number of days from their creation time you want to wait for pending payments to finalize. If payments are still not paid after this deadline, they will be deleted and the buyers will be notified by email. Defaults to 7.";
 
 // Module
 $l['bankpipe'] = 'BankPipe';
@@ -56,10 +48,10 @@ $l['bankpipe_subscriptions_desc'] = $l['bankpipe_edit_subscription_desc'] = 'See
 
 $l['bankpipe_subscriptions_name'] = 'Name';
 $l['bankpipe_subscriptions_name_desc'] = 'The name of this subscription. It will be displayed to the user when purchasing this subscription.';
-$l['bankpipe_subscriptions_description'] = 'PayPal description';
-$l['bankpipe_subscriptions_description_desc'] = 'This description will be displayed to the user when purchasing this subscription on PayPal. You can add up to 127 characters, HTML is not supported.';
-$l['bankpipe_subscriptions_email'] = 'PayPal custom email';
-$l['bankpipe_subscriptions_email_desc'] = 'Enter a custom PayPal email (merchant) to send the money to when users purchase this subscription. If set, this will override the default merchant set in BankPipe\'s settings.';
+$l['bankpipe_subscriptions_description'] = 'Gateway description';
+$l['bankpipe_subscriptions_description_desc'] = 'This description will be displayed when purchasing this subscription on the off-site gateway of the user\'s choice. You can add up to 127 characters, HTML is not supported.';
+$l['bankpipe_subscriptions_wallet'] = 'Custom wallets';
+$l['bankpipe_subscriptions_wallet_desc'] = 'Specify a custom wallet to send the money to when users purchase this subscription. If set, this will override the default merchant set in BankPipe\'s gateways settings.';
 $l['bankpipe_subscriptions_htmldescription'] = 'Forum description';
 $l['bankpipe_subscriptions_htmldescription_desc'] = 'The extended description will be displayed in the forum. You can add HTML and an unlimited amount of characters.';
 $l['bankpipe_subscriptions_price'] = $l['bankpipe_subscriptions_price'] = 'Price';
@@ -143,11 +135,11 @@ $l['bankpipe_history_no_payments'] = 'There are currently no payments completed 
 $l['bankpipe_history_edit'] = 'Edit';
 $l['bankpipe_history_refund'] = 'Refund';
 $l['bankpipe_history_revoke'] = 'Revoke';
-$l['bankpipe_history_revenue'] = '<b>Revenue</b>: {1} {2}';
+$l['bankpipe_history_revenue'] = '<b>Revenue</b>: {1}';
 
 // Manual add
 $l['bankpipe_manual_add'] = 'Subscribe users';
-$l['bankpipe_manual_add_desc'] = 'This tool lets you manually add an user to a subscription. Refund options will be available only if you specify a valid PayPal transaction ID.';
+$l['bankpipe_manual_add_desc'] = 'This tool lets you manually add an user to a subscription. Refund options will be available only if you specify a valid transaction ID.';
 $l['bankpipe_manual_add_user'] = 'Users to subscribe';
 $l['bankpipe_manual_add_user_desc'] = 'Select who will be subscribed to the specified subscription.';
 $l['bankpipe_manual_add_usergroup'] = 'Usergroups to subscribe';
@@ -159,7 +151,7 @@ $l['bankpipe_manual_add_start_date_desc'] = 'Select a starting date for this sub
 $l['bankpipe_manual_add_end_date'] = 'Expiry date';
 $l['bankpipe_manual_add_end_date_desc'] = 'Select an expiry date for this subscription. Future dates are accepted. If left blank, the subscription\'s default expiry amount of days will be applied calculated starting from the start date.';
 $l['bankpipe_manual_add_sale_id'] = 'Sale ID';
-$l['bankpipe_manual_add_sale_id_desc'] = '(Optional) Add a valid PayPal sale ID. When provided, this subscription will be refundable in the appropriate section. This will not work when multiple users are selected.';
+$l['bankpipe_manual_add_sale_id_desc'] = '(Optional) Add a valid sale ID. When provided, this subscription will be refundable in the appropriate section for most of the available gateways. This will not work when multiple users are selected.';
 
 // Manage purchase
 $l['bankpipe_manage_purchase'] = 'Manage purchase';
@@ -241,11 +233,10 @@ $l['bankpipe_success_discount_deleted'] = 'Discount deleted successfully.';
 $l['bankpipe_success_users_added'] = 'The user(s) you have specified have been subscribed successfully to the selected subscription plan.';
 $l['bankpipe_success_deleted_selected_logs'] = 'The log(s) you have selected have been deleted successfully.';
 $l['bankpipe_success_purchase_edited'] = 'The purchase has been edited successfully.';
-$l['bankpipe_success_purchase_refunded'] = 'The purchase has been refunded successfully. {1} have been sent to the user. This transaction costed {2} to the merchant in PayPal refund fees.';
+$l['bankpipe_success_purchase_refunded'] = 'The purchase has been refunded successfully. {1} have been sent to the user. This transaction costed {2} to the merchant in refund fees.';
 $l['bankpipe_success_purchase_revoked'] = 'The purchase has been revoked successfully and the user has been reverted to the usergroup he was in before.';
 $l['bankpipe_success_updated'] = "BankPipe has been updated correctly from version {1} to {2}. Good job!";
 
-$l['bankpipe_error_missing_default_payee'] = 'The default merchant is missing. Please specify one before attempting to create a subscription.';
 $l['bankpipe_error_price_not_valid'] = 'The price you entered does not look to be a valid price. Please enter a positive number, either integer or with decimals separated by a dot.';
 $l['bankpipe_error_invalid_item'] = 'This subscription appears to be invalid.';
 $l['bankpipe_error_invalid_purchase'] = 'This purchase appears to be invalid.';
@@ -259,6 +250,12 @@ $l['bankpipe_error_cannot_exceed_hundreds'] = "You cannot enter a value more tha
 
 // Tasks
 $l['task_bankpipe_ran'] = 'Subscriptions and their buyers have been cleared and/or notified successfully.';
+$l['bankpipe_notification_pending_payment_cancelled_title'] = 'Your order has been cancelled';
+$l['bankpipe_notification_pending_payment_cancelled'] = 'Dear {1},
+your order {2} has been deleted automatically after {3} days of waiting the payment. Please make sure you hold sufficient funds to perform the transaction.
+
+Best regards,
+{4}';
 
 // Permissions
 $l['viewing_field_candownloadpaidattachments'] = $l['bankpipe_can_dl_paid_attachs'] = 'Can download paid attachments without purchasing?';

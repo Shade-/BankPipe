@@ -14,6 +14,12 @@ class Subscriptions extends Usercp
     {
         $this->traitConstruct();
 
+        $gateways = [];
+        $query = $this->db->simple_select('bankpipe_gateways', '*');
+        while ($gateway = $this->db->fetch_array($query)) {
+            $gateways[] = $gateway;
+        }
+
         global $theme, $templates, $headerinclude, $header, $footer, $usercpnav;
         global $mybb, $lang; // Required for bankpipe_script
 
@@ -29,31 +35,9 @@ class Subscriptions extends Usercp
             $errors = inline_error($errors);
         }
 
-        $appliedDiscounts = '';
-        $existingDiscounts = $cookies->read('discounts');
-
-        if ($existingDiscounts) {
-
-            $search = implode(',', array_map('intval', $existingDiscounts));
-
-            $query = $this->db->simple_select(Items::DISCOUNTS_TABLE, '*', 'did IN (' . $search . ')');
-            while ($discount = $this->db->fetch_array($query)) {
-
-                $discount['suffix'] = ($discount['type'] == 1) ? '%' : ' ' . $this->mybb->settings['bankpipe_currency'];
-                $code = ($discount['name']) ? $discount['name'] : $discount['code'];
-
-                eval("\$appliedDiscounts .= \"".$templates->get("bankpipe_discounts_code")."\";");
-
-                $discounts[] = $discount;
-
-            }
-
-        }
-
         $currency = Core::friendlyCurrency($this->mybb->settings['bankpipe_currency']);
 
         eval("\$script = \"".$templates->get("bankpipe_script")."\";");
-        eval("\$discountArea = \"".$templates->get("bankpipe_discounts")."\";");
 
         $highestPurchased = $subs = $purchases = [];
 
@@ -82,75 +66,6 @@ class Subscriptions extends Usercp
 
                 $skip = false;
 
-                if ($discounts) {
-
-                    foreach ($discounts as $discount) {
-
-                        if ($discount['bids']) {
-
-                            $bids = explode(',', $discount['bids']);
-
-                            if (!in_array($subscription['bid'], $bids)) {
-                                $skip = true;
-                            }
-
-                        }
-
-                    }
-
-                }
-
-                // Discounts?
-                if ((
-                        $subscription['discount']
-                        and $highestPurchased['price']
-                        and $subscription['price'] >= $highestPurchased['price']
-                    )
-                    or ($discounts and !$skip)
-                    ) {
-
-                    $subscription['discounted'] = $subscription['price'];
-                    $discount = 0;
-
-                    if ($subscription['discount']) {
-                        $discount = ($highestPurchased['price'] * $subscription['discount'] / 100);
-                    }
-
-                    if ($discounts) {
-
-                        foreach ($discounts as $discount) {
-
-                            // Percentage
-                            if ($discount['type'] == 1) {
-                                $discount = (($subscription['discounted'] / 100) * $discount['value']);
-                            }
-                            // Absolute value
-                            else {
-                                $discount = $discount['value'];
-                            }
-
-                        }
-
-                    }
-
-                    // Scrape off the discount
-                    if ($discount) {
-
-                        $subscription['discounted'] -= $discount;
-
-                        if ($subscription['discounted'] <= 0) {
-                            $subscription['discounted'] = 0;
-                        }
-
-                    }
-
-                    eval("\$price = \"".$templates->get("bankpipe_subscriptions_subscription_price_discounted")."\";");
-
-                }
-                else {
-                    eval("\$price = \"".$templates->get("bankpipe_subscriptions_subscription_price")."\";");
-                }
-
                 // Bought or not?
                 if ($purchases[$subscription['bid']] and $highestPurchased['bid'] == $subscription['bid']) {
 
@@ -159,7 +74,16 @@ class Subscriptions extends Usercp
 
                 }
                 else {
-                    eval("\$subscriptions .= \"".$templates->get("bankpipe_subscriptions_subscription")."\";");
+
+                    $itemsInCart = $cookies->read('items');
+
+                    if (in_array($subscription['bid'], $itemsInCart)) {
+                        eval("\$subscriptions .= \"".$templates->get("bankpipe_subscriptions_subscription_added")."\";");
+                    }
+                    else {
+                        eval("\$subscriptions .= \"".$templates->get("bankpipe_subscriptions_subscription")."\";");
+                    }
+
                 }
 
             }
@@ -173,6 +97,6 @@ class Subscriptions extends Usercp
 
         eval("\$page = \"".$templates->get("bankpipe_subscriptions")."\";");
         output_page($page);
-
+        exit;
     }
 }

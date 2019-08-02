@@ -112,7 +112,7 @@ class History
             'includeItemsInfo' => true
         ]);
 
-        $revenue = 0;
+        $revenue = [];
 
         // Cache users
         $users = [];
@@ -129,7 +129,7 @@ class History
 
             // Revenue
             $totalPaid = ($order['total'] - $order['fee']);
-            $revenue += $totalPaid;
+            $revenue[$order['currency_code']] += $totalPaid;
 
             // Buyer
             $user = $users[$order['buyer']];
@@ -165,13 +165,14 @@ class History
 
                 $extra = $this->lang->bankpipe_history_refunded;
                 $class = 'refunded';
-                $revenue -= $totalPaid;
+                $revenue[$order['currency_code']] -= $totalPaid;
 
             }
             else if ($order['type'] == Orders::PENDING) {
 
                 $extra = $this->lang->bankpipe_history_pending;
                 $class = 'pending';
+                $revenue[$order['currency_code']] -= $totalPaid;
 
             }
             else if ($order['expires'] and $order['expires'] < TIME_NOW) {
@@ -229,13 +230,17 @@ class History
             $table->construct_row();
         }
 
-        if ($revenue > 0) {
+        if ($revenue) {
+
+            $html = [];
+            foreach ($revenue as $curr => $amount) {
+                $html[] = $amount . ' ' . Core::friendlyCurrency($curr);
+            }
 
             $table->construct_cell(
                 $this->lang->sprintf(
                     $this->lang->bankpipe_history_revenue,
-                    $revenue,
-                    Core::friendlyCurrency($this->mybb->settings['bankpipe_currency'])
+                    implode(', ', $html)
                 ),
                 ['colspan' => 7, 'style' => 'text-align: center']
             );

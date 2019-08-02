@@ -12,7 +12,7 @@ class Handler
     protected $parserOptions;
     protected $pm;
     protected $sendEmail;
-    protected $queue;
+    protected $queue = [];
 
     public function __construct()
     {
@@ -54,12 +54,6 @@ class Handler
             return false;
         }
 
-        $this->queue = [
-            'title' => $title,
-            'message' => $message,
-            'receivers' => $receivers
-        ];
-
         // Custom fields? Find and replace those fuckers
         $find = $replace = [];
 
@@ -77,8 +71,14 @@ class Handler
         }
 
         if ($find and $replace) {
-            $this->queue['message'] = str_replace($find, $replace, $this->queue['message']);
+            $message = str_replace($find, $replace, $message);
         }
+
+        $this->queue[] = [
+            'title' => $title,
+            'message' => $message,
+            'receivers' => $receivers
+        ];
 
         $this->plugins->run_hooks('bankpipe_notifications_set', $this);
 
@@ -100,48 +100,56 @@ class Handler
                 (int) $this->mybb->settings['bankpipe_admin_notification_sender'] :
                 -1;
 
-            $pm = [
-                "subject" => $this->queue['title'],
-                "message" => $this->queue['message'],
-                "fromid" => $sender,
-                "toid" => $this->queue['receivers']
-            ];
-
-            $this->pm->set_data($pm);
-
-            if ($this->pm->validate_pm()) {
-                $this->pm->insert_pm();
+            foreach ($this->queue as $queuedElement) {
+                
+                $pm = [
+                    "subject" => $queuedElement['title'],
+                    "message" => $queuedElement['message'],
+                    "fromid" => $sender,
+                    "toid" => $queuedElement['receivers']
+                ];
+    
+                $this->pm->set_data($pm);
+    
+                if ($this->pm->validate_pm()) {
+                    $this->pm->insert_pm();
+                }
+            
             }
 
         }
         else {
 
             $queue = $emails = [];
+            
+            foreach ($this->queue as $queuedElement) {
 
-            // Get user emails
-            $query = $this->db->simple_select('users', 'uid, email', 'uid IN (' . implode(',', $this->queue['receivers']) . ')');
-            while ($user = $this->db->fetch_array($query)) {
-
-                if ($user['email']) {
-                    $emails[$user['uid']] = $user['email'];
+                // Get user emails
+                $query = $this->db->simple_select('users', 'uid, email', 'uid IN (' . implode(',', $queuedElement['receivers']) . ')');
+                while ($user = $this->db->fetch_array($query)) {
+    
+                    if ($user['email']) {
+                        $emails[$user['uid']] = $user['email'];
+                    }
+    
                 }
-
-            }
-
-            foreach ($this->queue['receivers'] as $uid) {
-
-                if ($emails[$uid]) {
-
-                    $queue[] = [
-                        "mailto" => $this->db->escape_string($emails[$uid]),
-                        "mailfrom" => '',
-                        "subject" => $this->db->escape_string($this->queue['title']),
-                        "message" => $this->db->escape_string($this->queue['message']),
-                        "headers" => ''
-                    ];
-
+    
+                foreach ($queuedElement['receivers'] as $uid) {
+    
+                    if ($emails[$uid]) {
+    
+                        $queue[] = [
+                            "mailto" => $this->db->escape_string($emails[$uid]),
+                            "mailfrom" => '',
+                            "subject" => $this->db->escape_string($queuedElement['title']),
+                            "message" => $this->db->escape_string($queuedElement['message']),
+                            "headers" => ''
+                        ];
+    
+                    }
+    
                 }
-
+            
             }
 
             if (!empty($queue)) {

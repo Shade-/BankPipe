@@ -12,6 +12,7 @@ use BankPipe\Logs\Handler as Logs;
 use BankPipe\Helper\Cookies;
 use BankPipe\Notifications\Handler as Notifications;
 use BankPipe\Messages\Handler as Messages;
+use BankPipe\Helper\Permissions;
 
 class Core implements GatewayInterface
 {
@@ -19,6 +20,7 @@ class Core implements GatewayInterface
 
     protected $gatewayName;
     protected $orderId;
+    public $gateways;
 
     public function __construct()
     {
@@ -31,6 +33,11 @@ class Core implements GatewayInterface
         $this->cookies = new Cookies;
         $this->notifications = new Notifications;
         $this->messages = new Messages;
+
+        $query = $this->db->simple_select('bankpipe_gateways', '*');
+        while ($gateway = $this->db->fetch_array($query)) {
+            $this->gateways[$gateway['name']] = $gateway;
+        }
     }
 
     /**
@@ -44,11 +51,173 @@ class Core implements GatewayInterface
      */
     public function purchase(array $parameters, array $items)
     {
+        $settings = array_merge($parameters, [
+            'amount' => 0,
+            'currency' => $parameters['currency'],
+            'returnUrl' => $this->getReturnUrl(),
+            'cancelUrl' => $this->getCancelUrl()
+        ]);
+
+        $finalItems = $bids = $discounts = $validatedDiscounts = [];
+        $finalPrice = 0;
+
+        // Cache discounts
+        $discountsInCart = $this->cookies->read('discounts');
+        if ($discountsInCart) {
+
+            $search = implode(',', array_map('intval', $discountsInCart));
+
+            $permissions = new Permissions;
+
+            $query = $this->db->simple_select('bankpipe_discounts', '*', 'did IN (' . $search . ')');
+            while ($discount = $this->db->fetch_array($query)) {
+                $discounts[] = $discount;
+            }
+
+        }
+
+        // Loop through all the items
+        foreach ($items as $item) {
+
+            $finalPrice = $price = self::filterPrice($item['price']);
+
+            $itemDiscounts = [];
+
+            $itemData = [
+                'name' => $item['name'],
+                'price' => $price,
+                'quantity' => 1,
+                'bid' => $item['bid']
+            ];
+
+            // Expiration date
+            if ($item['expires']) {
+                $itemData['expires'] = (TIME_NOW + (60*60*24*$item['expires']));
+            }
+
+            // Description
+            if ($item['description']) {
+                $itemData['description'] = $item['description'];
+            }
+
+            // Destination usergroup
+            if ($item['gid']) {
+
+                $itemData['oldgid'] = ($item['expirygid']) ? $item['expirygid'] : $this->mybb->user['usergroup'];
+                $itemData['newgid'] = $item['gid'];
+
+            }
+
+            // Add this item to the final array
+            $finalItems[] = $itemData;
+
+            // Apply discounts
+            // Previous subscriptions
+            $item['discount'] = (int) $item['discount'];
+
+            if ($item['discount'] > 0) {
+
+                // Search for the highest paid previous subscription of this user
+                $query = $this->db->query('
+                    SELECT MAX(i.price) AS price, p.payment_id
+                    FROM ' . TABLE_PREFIX . 'bankpipe_items i
+                    LEFT JOIN ' . TABLE_PREFIX . 'bankpipe_payments p ON (p.uid = ' . (int) $this->mybb->user['uid'] . ' AND p.bid = i.bid AND p.active = 1)
+                    WHERE i.type = ' . Items::SUBSCRIPTION . ' AND p.payment_id IS NOT NULL AND i.bid <> ' . (int) $item['bid'] . '
+                    LIMIT 1
+                ');
+                $oldSubscription = $this->db->fetch_array($query);
+
+                // If found, calculate relative discount
+                if ($oldSubscription['price']) {
+                    $price = ($item['price'] - ($oldSubscription['price'] * $item['discount'] / 100));
+                }
+
+                $price = ($price > 0) ? $price : 0;
+
+                if ($price != $finalPrice) {
+
+                    // Set new price
+                    $finalPrice = $price;
+
+                    $discountAmount = self::filterPrice($price - $item['price']);
+
+                    // Add discount
+                    $finalItems[] = [
+                        'name' => $this->lang->bankpipe_discount_previous_item,
+                        'description' => $this->lang->bankpipe_discount_previous_item_desc,
+                        'price' => $discountAmount,
+                        'quantity' => 1
+                    ];
+
+                    $itemDiscounts[] = [
+                        'id' => 'p',
+                        'amount' => $discountAmount
+                    ];
+
+                }
+
+            }
+
+            // Code discounts
+            if ($discounts and $item['type'] == Items::SUBSCRIPTION) {
+
+                foreach ($discounts as $discount) {
+
+                    if (!$permissions->discountCheck($discount, $item)) {
+                        continue;
+                    }
+
+                    // Finally apply the discount
+                    // Percentage
+                    if ($discount['type'] == 1) {
+                        $price = $finalPrice - ($finalPrice * $discount['value'] / 100);
+                    }
+                    // Absolute
+                    else {
+                        $price = $finalPrice - $discount['value'];
+                    }
+
+                    $price = ($price > 0) ? $price : 0;
+
+                    if ($price != $finalPrice) {
+
+                        $discountAmount = self::filterPrice($price - $finalPrice);
+
+                        // Add discount
+                        $finalItems[] = [
+                            'name' => $discount['code'],
+                            'description' => $this->lang->bankpipe_discount_code_desc,
+                            'price' => $discountAmount,
+                            'quantity' => 1,
+                            'did' => $discount['did']
+                        ];
+
+                        // Set the new final price
+                        $finalPrice = $price;
+
+                        $itemDiscounts[] = [
+                            'id' => $discount['did'],
+                            'amount' => $discountAmount
+                        ];
+
+                    }
+
+                }
+
+            }
+
+            $settings['amount'] += $finalPrice; // Add this item to the total
+            $validatedDiscounts[$item['bid']] = $itemDiscounts;
+
+        }
+
+        $settings['amount'] = self::filterPrice($settings['amount']);
+
         try {
 
             $response = $this->gateway
-                ->purchase($parameters)
-                ->setItems($items)
+                ->purchase($settings)
+                ->setItems($finalItems)
                 ->send();
 
         }
@@ -56,17 +225,18 @@ class Core implements GatewayInterface
             return $this->messages->error($e->getMessage());
         }
 
-        $parameters['type'] = Orders::CREATE;
+        $settings['type'] = $settings['type'] ?? Orders::CREATE;
+        $settings['discounts'] = $validatedDiscounts;
 
         // If preparation is successful, insert the preliminary order (will be authorized or destroyed in the complete() method)
-        $bids = $this->orders->insert($items, $this->orderId, $parameters);
+        $bids = $this->orders->insert($finalItems, $this->orderId, $settings);
 
         $this->log->save([
-            'type' => Orders::CREATE,
+            'type' => $settings['type'],
             'bids' => $bids
         ]);
 
-        $args = [&$this, &$items];
+        $args = [&$this, &$finalItems];
         $this->plugins->run_hooks('bankpipe_core_purchase', $args);
 
         return $response;
@@ -87,6 +257,8 @@ class Core implements GatewayInterface
 
         $order = reset($this->orders->get([
             'invoice' => $this->orderId
+        ], [
+            'includeItemsInfo' => true
         ]));
 
         if (!$order) {
@@ -116,55 +288,7 @@ class Core implements GatewayInterface
             ], $this->orderId);
 
             // Update usergroup
-            $update = [];
-            $additionalGroups = (array) explode(',', $this->mybb->user['additionalgroups']);
-
-            // TO-DO: change getItems($bids) to something already available?
-            foreach ($this->items->getItems($bids) as $item) {
-
-                if ($item['gid']) {
-
-                    if ($item['primarygroup']) {
-
-                        // Move the current primary group to the additional groups array
-                        $additionalGroups[] = $this->mybb->user['usergroup'];
-
-                        $update['usergroup'] = (int) $item['gid'];
-                        $update['displaygroup'] = 0; // Use primary
-
-                    }
-                    else {
-
-                        // Check if the new gid is already present and eventually add it
-                        if (!in_array($item['gid'], $additionalGroups)) {
-                            $additionalGroups[] = $item['gid'];
-                        }
-
-                    }
-
-                    $update['additionalgroups'] = $additionalGroups;
-
-                }
-
-            }
-
-            if ($update['additionalgroups']) {
-                $update['additionalgroups'] = implode(',', self::normalizeArray($additionalGroups));
-            }
-
-            if ($update) {
-                $this->db->update_query('users', $update, "uid = '" . (int) $this->mybb->user['uid'] . "'");
-            }
-
-            // Wipe cart cookies
-            if ($this->mybb->settings['bankpipe_cart_mode'] and $this->mybb->cookies['bankpipe-items']) {
-                $this->cookies->destroy('items');
-            }
-
-            // Wipe discount cookies
-            if ($this->mybb->cookies['bankpipe-discounts']) {
-                $this->cookies->destroy('discounts');
-            }
+            $this->updateUsergroup($order['items'], $order['buyer']);
 
             $this->log->save([
                 'type' => Orders::SUCCESS,
@@ -188,6 +312,7 @@ class Core implements GatewayInterface
 
         return [
             'response' => $response,
+            'status' => $response->isSuccessful(),
             'invoice' => $this->orderId
         ];
     }
@@ -195,6 +320,55 @@ class Core implements GatewayInterface
     public function refund(array $parameters = [])
     {
         return $this->gateway->refund($parameters);
+    }
+
+    public function updateUsergroup(array $items = [], int $uid = 0)
+    {
+        if (!$uid) {
+            return false;
+        }
+
+        $user = get_user($uid);
+
+        // Update usergroup
+        $update = [];
+        $additionalGroups = (array) explode(',', $user['additionalgroups']);
+
+        foreach ($items as $item) {
+
+            if ($item['gid']) {
+
+                if ($item['primarygroup']) {
+
+                    // Move the current primary group to the additional groups array
+                    $additionalGroups[] = $user['usergroup'];
+
+                    $update['usergroup'] = (int) $item['gid'];
+                    $update['displaygroup'] = 0; // Use primary
+
+                }
+                else {
+
+                    // Check if the new gid is already present and eventually add it
+                    if (!in_array($item['gid'], $additionalGroups)) {
+                        $additionalGroups[] = $item['gid'];
+                    }
+
+                }
+
+                $update['additionalgroups'] = $additionalGroups;
+
+            }
+
+        }
+
+        if ($update['additionalgroups']) {
+            $update['additionalgroups'] = implode(',', self::normalizeArray($additionalGroups));
+        }
+
+        if ($update) {
+            return $this->db->update_query('users', $update, "uid = '" . $uid . "'");
+        }
     }
 
     public function verifyWebhookSignature(array $parameters = [])
@@ -219,7 +393,7 @@ class Core implements GatewayInterface
 
     public function getNotifyUrl()
     {
-        return $this->mybb->settings['bburl'] . '/bankpipe.php?action=notify&gateway=' . $this->gatewayName . '&orderId=' . $this->orderId;
+        return $this->mybb->settings['bburl'] . '/bankpipe.php?action=webhooks&gateway=' . $this->gatewayName . '&orderId=' . $this->orderId;
     }
 
     public function getOrderId()

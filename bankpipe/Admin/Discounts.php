@@ -37,7 +37,7 @@ class Discounts
 
                 $data = [
                     'code' => $this->db->escape_string($this->mybb->input['code']),
-                    'value' => Core::filterPrice($this->mybb->input['value']),
+                    'value' => Core::filterPrice((string) $this->mybb->input['value']),
                     'expires' => (int) $this->mybb->input['expires'],
                     'type' => (int) $this->mybb->input['type'],
                     'stackable' => (int) $this->mybb->input['stackable'],
@@ -377,7 +377,9 @@ HTML;
 
                     $text = implode(', ', $text);
 
-                    $text = $text ?? $this->lang->bankpipe_discounts_no_restrictions;
+                    if (!$text) {
+                        $text = $this->lang->bankpipe_discounts_no_restrictions;
+                    }
 
                     $table->construct_cell($text, ['style' => 'text-align: center']);
 

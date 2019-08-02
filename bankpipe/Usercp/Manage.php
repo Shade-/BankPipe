@@ -4,6 +4,7 @@ namespace BankPipe\Usercp;
 
 use BankPipe\Helper\Permissions;
 use BankPipe\Core;
+use BankPipe\Items\Items;
 
 class Manage extends Usercp
 {
@@ -21,25 +22,53 @@ class Manage extends Usercp
 
         $uid = (int) $this->mybb->user['uid'];
 
-        $payee = $this->mybb->user['payee'];
+        $query = $this->db->simple_select('bankpipe_wallets', '*', 'uid = ' . $uid);
+        $wallet = $this->db->fetch_array($query);
+
+        $gateways = [];
+        $query = $this->db->simple_select('bankpipe_gateways', 'name');
+        while ($name = $this->db->fetch_field($query, 'name')) {
+            $gateways[] = $name;
+        }
 
         if ($this->mybb->request_method == 'post') {
 
-            // Delete all items if no payee is specified
-            // TO-DO: this is quite unreliable. gid = 0 should be replaced with "type" once it is implemented in the db
-            // TO-DO: implement "type" in the db
-            if ($payee and !$this->mybb->input['payee']) {
-                $this->db->delete_query('bankpipe_items', 'gid = 0 AND uid = ' . $uid);
+            $update = [];
+            $delete = true;
+
+            // Add wallets
+            foreach ($gateways as $gateway) {
+
+                if ($this->mybb->input[$gateway] != $wallet[$gateway]) {
+                    $update[$gateway] = $this->db->escape_string($this->mybb->input[$gateway]);
+                }
+
+                if ($this->mybb->input[$gateway]) {
+                    $delete = false;
+                }
+
             }
 
-            // Add payee
-            if ($this->mybb->input['payee'] != $payee) {
+            // Delete entry if no wallets are specified
+            if ($delete) {
+                $this->db->delete_query('bankpipe_wallets', 'uid = ' . $uid);
+            }
 
-                $this->db->update_query(
-                    'users',
-                    ['payee' => $this->db->escape_string($this->mybb->input['payee'])],
-                    'uid = ' . $uid
-                );
+            // Update wallets
+            if ($update) {
+
+                // Update
+                if ($wallet) {
+                    $this->db->update_query('bankpipe_wallets', $update, 'uid = ' . $uid);
+                }
+                // Insert
+                else {
+
+                    $update['uid'] = $uid;
+
+                    $this->db->insert_query('bankpipe_wallets', $update);
+
+                }
 
             }
 
@@ -90,6 +119,13 @@ class Manage extends Usercp
         add_breadcrumb($this->lang->bankpipe_nav, 'usercp.php');
         add_breadcrumb($this->lang->bankpipe_nav_purchases, 'usercp.php?action=manage&env=bankpipe');
 
+        // Wallets
+        $wallets = '';
+        foreach ($gateways as $gateway) {
+            eval("\$wallets .= \"".$templates->get("bankpipe_manage_wallet")."\";");
+        }
+
+        // Items
         $query = $this->db->simple_select('bankpipe_items', 'COUNT(bid) AS total', 'uid = ' . $uid);
         $totalItems = $this->db->fetch_field($query, 'total');
 

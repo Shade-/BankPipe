@@ -1,0 +1,27 @@
+{
+  "name": "zek/omnipay-coinbase",
+  "type": "library",
+  "description": "Coinbase driver for the Omnipay payment processing library",
+  "keywords": [
+    "coinbase",
+    "gateway",
+    "merchant",
+    "omnipay",
+    "pay",
+    "payment"
+  ],
+  "homepage": "https://github.com/zek/omnipay-coinbase",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Talha Zekeriya Durmuş",
+      "homepage": "https://github.com/zek"
+    }
+  ],
+  "autoload": {
+    "psr-4": { "Omnipay\\Coinbase\\" : "src/" }
+  },
+  "require": {
+    "omnipay/common": "~3.0"
+  }
+}

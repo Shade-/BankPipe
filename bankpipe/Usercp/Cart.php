@@ -2,6 +2,7 @@
 
 namespace BankPipe\Usercp;
 
+use BankPipe\Core;
 use BankPipe\Helper\Permissions;
 use BankPipe\Helper\Cookies;
 use BankPipe\Items\Items;
@@ -23,7 +24,13 @@ class Cart extends Usercp
         $permissions = new Permissions;
         $messages = new Messages;
 
-        $existingItems = $cookies->read('items');
+        $gateways = [];
+        $query = $this->db->simple_select('bankpipe_gateways', '*');
+        while ($gateway = $this->db->fetch_array($query)) {
+            $gateways[] = $gateway;
+        }
+
+        $itemsInCart = $cookies->read('items');
 
         // Errors
         if ($errors) {
@@ -34,14 +41,15 @@ class Cart extends Usercp
 
             $errors = [];
 
-            $aid = (int) $this->mybb->input['aid'];
+            $bid = (int) $this->mybb->input['bid'];
+            $type = (int) $this->mybb->input['type'];
 
             $this->plugins->run_hooks('bankpipe_ucp_cart_add_start', $this);
 
             // Does this item exist?
-            if ($aid) {
+            if ($bid) {
 
-                $exists = $itemsHandler->getAttachment($aid);
+                $exists = $itemsHandler->getItem($bid);
 
                 if (!$exists['bid']) {
                     $errors[] = $this->lang->bankpipe_cart_item_unknown;
@@ -49,26 +57,48 @@ class Cart extends Usercp
                 else {
 
                     // Get first item out of existing items
-                    $firstItem = (int) reset($existingItems);
-                    if ($firstItem and $aid) {
+                    $firstItem = (int) reset($itemsInCart);
+                    if ($firstItem and $bid and $bid != $firstItem) {
 
                         $infos = [];
 
-                        // Merchant check – since some gateways (like PayPal) can't handle multiple payees at once,
+                        // Merchant check – since some gateways (like PayPal) can't handle multiple merchants at once,
                         // we must block every attempt to stack items from different merchants. The first item is enough,
                         // as if there are more, this check will prevent stacked items to be part of a different merchant.
                         $query = $this->db->query('
-                            SELECT a.aid, u.payee
-                            FROM ' . TABLE_PREFIX . 'attachments a
-                            LEFT JOIN ' . TABLE_PREFIX . 'users u ON (u.uid = a.uid)
-                            WHERE a.aid IN (\'' . $aid .  "','" . $firstItem . '\')
+                            SELECT i.bid, w.*
+                            FROM ' . TABLE_PREFIX . 'bankpipe_items i
+                            LEFT JOIN ' . TABLE_PREFIX . 'bankpipe_wallets w ON (w.uid = i.uid)
+                            WHERE i.bid IN (\'' . $bid .  "','" . $firstItem . '\')
                         ');
-                        while ($info = $this->db->fetch_array($query)) {
-                            $infos[$info['aid']] = $info['payee'];
+                        while ($wallets = $this->db->fetch_array($query)) {
+                            $infos[$wallets['bid']] = $wallets;
                         }
 
-                        if ($infos[$firstItem] and $infos[$firstItem] != $infos[$aid]) {
-                            $errors[] = $this->lang->bankpipe_cart_payee_different;
+                        // Determine the first item wallet. If not set, create it.
+                        $firstItemWallet = $infos[$firstItem];
+
+                        if (!$firstItemWallet) {
+
+                            foreach ($gateways as $gateway) {
+                                $firstItemWallet[$gateway['name']] = $gateway['wallet'];
+                            }
+
+                        }
+
+                        foreach ($infos as $wallets) {
+
+                            unset($wallets['bid'], $wallets['uid']);
+
+                            foreach ($wallets as $name => $wallet) {
+
+                                if ($firstItemWallet[$name] != $wallet) {
+                                    $errors[] = $this->lang->bankpipe_cart_merchant_different;
+                                    break;
+                                }
+
+                            }
+
                         }
 
                     }
@@ -82,11 +112,12 @@ class Cart extends Usercp
 
             if (!$errors) {
 
-                if (!in_array($aid, $existingItems)) {
-                    $existingItems[] = $aid;
+                // Add attachments
+                if (!in_array($bid, $itemsInCart)) {
+                    $itemsInCart[] = $bid;
                 }
 
-                $cookies->write('items', $existingItems);
+                $cookies->write('items', $itemsInCart);
 
                 $messages->display([
                     'title' => $this->lang->bankpipe_cart_item_added,
@@ -105,17 +136,17 @@ class Cart extends Usercp
 
             $this->plugins->run_hooks('bankpipe_ucp_cart_remove', $this);
 
-            $aid = (int) $this->mybb->input['aid'];
+            $bid = (int) $this->mybb->input['bid'];
 
-            if (($key = array_search($aid, $existingItems)) !== false) {
-                unset($existingItems[$key]);
+            if (($key = array_search($bid, $itemsInCart)) !== false) {
+                unset($itemsInCart[$key]);
             }
 
-            if (!array_filter($existingItems)) {
+            if (!array_filter($itemsInCart)) {
                 $cookies->destroy('items');
             }
             else {
-                $cookies->write('items', $existingItems);
+                $cookies->write('items', $itemsInCart);
             }
 
             $messages->display([
@@ -136,7 +167,7 @@ class Cart extends Usercp
         $items = $appliedDiscounts = $script = $discountArea = '';
 
         // Items
-        if ($existingItems) {
+        if ($itemsInCart) {
 
             // Discounts
             $existingDiscounts = $cookies->read('discounts');
@@ -162,29 +193,27 @@ class Cart extends Usercp
 
             eval("\$discountArea = \"".$templates->get("bankpipe_discounts")."\";");
 
-            $search = array_map('intval', $existingItems);
-            $paidItems = $itemsHandler->getAttachments($search);
+            $search = array_map('intval', $itemsInCart);
+            $paidItems = $itemsHandler->getItems($search);
+            $aids = Core::normalizeArray(array_column($paidItems, 'aid'));
 
             $tot = 0;
             if ($paidItems) {
 
-                $query = $this->db->simple_select('attachments', 'aid, pid', 'aid IN (' . implode(',', $search) . ')');
-                while ($attach = $this->db->fetch_array($query)) {
-                    $pids[$attach['aid']] = $attach['pid'];
-                }
+                if ($aids) {
 
-                if ($paidItems['bid']) {
-                    $paidItems = [$paidItems];
+                    $query = $this->db->simple_select('attachments', 'aid, pid', 'aid IN (' . implode(',', $aids) . ')');
+                    while ($attach = $this->db->fetch_array($query)) {
+                        $pids[$attach['aid']] = $attach['pid'];
+                    }
+
                 }
 
                 foreach ($paidItems as $item) {
 
-                    if (!$item['aid']) {
-                        continue;
-                    }
-
                     $itemDiscounts = '';
                     $discountsList = [];
+                    $item['price'] += 0;
                     $originalPrice = $item['price'];
 
                     // Apply discounts
@@ -225,7 +254,9 @@ class Cart extends Usercp
 
                     $tot += $item['price'];
 
-                    $item['postlink'] = get_post_link($pids[$item['aid']]);
+                    if ($pids[$item['aid']]) {
+                        $item['postlink'] = get_post_link($pids[$item['aid']]);
+                    }
 
                     eval("\$items .= \"".$templates->get("bankpipe_cart_item")."\";");
 
@@ -243,6 +274,18 @@ class Cart extends Usercp
             eval("\$items = \"".$templates->get("bankpipe_cart_no_items")."\";");
         }
         else {
+
+            $buyButtons = '';
+            foreach ($gateways as $gateway) {
+
+                $description = 'bankpipe_payment_method_' . $gateway['name'];
+                $description = $this->lang->$description;
+
+                if ($gateway['enabled']) {
+                    eval("\$buyButtons .= \"".$templates->get("bankpipe_payment_method")."\";");
+                }
+
+            }
 
             eval("\$noItemsTemplate = \"".$templates->get("bankpipe_cart_no_items")."\";");
             $noItemsTemplate = json_encode($noItemsTemplate);

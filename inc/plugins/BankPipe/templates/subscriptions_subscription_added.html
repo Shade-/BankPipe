@@ -1,0 +1,12 @@
+<tr>
+	<td class="trow1">
+		<strong>{$subscription['name']}</strong>
+		<div class="smalltext">{$subscription['htmldescription']}</div>
+	</td>
+	<td class="trow1" align="center">
+		{$subscription['price']}{$currency}
+	</td>
+	<td class="trow1" align="center">
+		<a href="usercp.php?action=cart&env=bankpipe&remove=1&bid={$subscription['bid']}" class="button bankpipe-item" data-action="remove" data-aid="{$subscription['bid']}">{$this->lang->bankpipe_remove_from_cart}</a>
+	</td>
+</tr>

@@ -29,11 +29,6 @@ class Subscriptions
 
         if ($this->mybb->request_method == 'post') {
 
-            if (!$this->mybb->settings['bankpipe_subscription_payee']) {
-                flash_message($this->lang->bankpipe_error_missing_default_payee, 'error');
-                admin_redirect(MAINURL);
-            }
-
             $price = $this->mybb->input['price'];
 
             if (!$this->mybb->input['delete'] and (!$price or $price <= 0)) {
@@ -49,16 +44,20 @@ class Subscriptions
                 $this->db->delete_query(Items::ITEMS_TABLE, "bid IN ('" . implode("','", (array) $this->mybb->input['delete']) . "')");
 
             }
-            else if (!$bid) {
-
-                $message = $this->lang->bankpipe_success_subscription_added;
-                $items->insert([$this->mybb->input]);
-
-            }
             else {
 
-                $message = $this->lang->bankpipe_success_subscription_edited;
-                $this->db->update_query(Items::ITEMS_TABLE, $data, "bid = '" . $subscription['bid'] . "'");
+                $message = (!$bid) ?
+                    $this->lang->bankpipe_success_subscription_added :
+                    $this->lang->bankpipe_success_subscription_edited;
+
+                if ($bid) {
+                    $this->mybb->input['bid'] = $bid;
+                }
+
+                $this->mybb->input['discount'] = (int) $this->mybb->input['discount'];
+                $this->mybb->input['expires'] = (int) $this->mybb->input['expires'];
+
+                $items->insert([$this->mybb->input]);
 
             }
 
@@ -112,14 +111,24 @@ class Subscriptions
             'description'
         );
 
+        // Custom wallet
+        $html = '';
+
+        $query = $this->db->simple_select('bankpipe_gateways', '*');
+        while ($gateway = $this->db->fetch_array($query)) {
+
+            $html .= $form->generate_text_box($gateway['name'], $this->mybb->input[$gateway['name']], [
+                'id' => $gateway['name'],
+                'style' => '" autocomplete="off" placeholder="' . $gateway['name']
+            ]) . ' ';
+
+        }
+
         $container->output_row(
-            $this->lang->bankpipe_subscriptions_email,
-            $this->lang->bankpipe_subscriptions_email_desc,
-            $form->generate_text_box('email', $this->mybb->input['email'], [
-                'id' => 'email',
-                'style' => '" autocomplete="off" placeholder="Default: ' . $this->mybb->settings['bankpipe_subscription_payee']
-            ]),
-            'email'
+            $this->lang->bankpipe_subscriptions_wallet,
+            $this->lang->bankpipe_subscriptions_wallet_desc,
+            $html,
+            'wallet'
         );
 
         $container->output_row(

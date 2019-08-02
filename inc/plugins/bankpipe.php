@@ -7,7 +7,7 @@
  * @package BankPipe
  * @license Copyrighted ©
  * @author  Shade <shad3-@outlook.com>
- * @version beta 6
+ * @version beta 7
  */
 
 if (!defined('IN_MYBB')) {
@@ -59,7 +59,7 @@ function bankpipe_info()
         'description'   =>  'A fully functional payment system for MyBB.' . $description,
         'website'       =>  'https://www.mybboost.com/forum-bankpipe',
         'author'        =>  'Shade',
-        'version'       =>  'beta 6',
+        'version'       =>  'beta 7',
         'compatibility' =>  '18*',
     ];
 }
@@ -87,32 +87,334 @@ function bankpipe_install()
         admin_redirect("index.php?module=config-plugins");
     }
 
+    // Add tables
+    if (!$db->table_exists('bankpipe_items')) {
+
+        $collation = $db->build_create_table_collation();
+
+        switch ($db->type) {
+            case 'pgsql':
+                $db->write_query("
+                CREATE TABLE " . TABLE_PREFIX . "bankpipe_items (
+                    bid serial,
+                    uid int DEFAULT '0',
+                    price decimal(6,2) NOT NULL,
+                    gid int DEFAULT '0',
+                    aid int DEFAULT '0',
+                    name varchar(128) DEFAULT NULL,
+                    description varchar(128) DEFAULT NULL,
+                    htmldescription text,
+                    discount smallint DEFAULT '0',
+                    expires int DEFAULT '0',
+                    primarygroup smallint DEFAULT '1',
+                    expirygid int DEFAULT '0',
+                    type smallint NOT NULL,
+                    PRIMARY KEY (bid)
+                );");
+                $db->write_query("CREATE INDEX aid ON " . TABLE_PREFIX . "bankpipe_items (aid);");
+                break;
+            default:
+                $db->write_query("
+                CREATE TABLE " . TABLE_PREFIX . "bankpipe_items (
+                    bid int(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    uid int(10) DEFAULT '0',
+                    price decimal(6,2) NOT NULL,
+                    gid int(10) DEFAULT '0',
+                    aid int(10) DEFAULT '0',
+                    name varchar(128) DEFAULT NULL,
+                    description varchar(128) DEFAULT NULL,
+                    htmldescription text,
+                    discount smallint(3) DEFAULT '0',
+                    expires int(10) DEFAULT '0',
+                    primarygroup tinyint(1) DEFAULT '1',
+                    expirygid int(5) DEFAULT '0',
+                    type tinyint(1) NOT NULL,
+                    KEY aid (aid)
+                ) ENGINE=MyISAM{$collation};
+                ");
+                break;
+        }
+
+    }
+
+    if (!$db->table_exists('bankpipe_log')) {
+
+        $collation = $db->build_create_table_collation();
+
+        switch ($db->type) {
+            case 'pgsql':
+                $db->write_query("
+                CREATE TABLE " . TABLE_PREFIX . "bankpipe_log (
+                    lid serial,
+                    invoice varchar(32) NOT NULL DEFAULT '',
+                    type smallint,
+                    bids text,
+                    uid int NOT NULL DEFAULT '0',
+                    pid int DEFAULT '0',
+                    message text,
+                    date int DEFAULT '0',
+                    PRIMARY KEY (lid)
+                );");
+                break;
+            default:
+                $db->write_query("
+                CREATE TABLE " . TABLE_PREFIX . "bankpipe_log (
+                    lid int(8) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    invoice varchar(32) NOT NULL DEFAULT '',
+                    type tinyint(1),
+                    bids text,
+                    uid int(10) NOT NULL DEFAULT '0',
+                    pid int(10) DEFAULT '0',
+                    message text,
+                    date int(10) DEFAULT '0'
+                ) ENGINE=MyISAM{$collation};
+                ");
+                break;
+        }
+
+    }
+
+    if (!$db->table_exists('bankpipe_downloadlogs')) {
+
+        $collation = $db->build_create_table_collation();
+
+        switch ($db->type) {
+            case 'pgsql':
+                $db->write_query("
+                CREATE TABLE " . TABLE_PREFIX . "bankpipe_downloadlogs (
+                    lid serial,
+                    pid int NOT NULL DEFAULT '0',
+                    uid int NOT NULL DEFAULT '0',
+                    aid int NOT NULL DEFAULT '0',
+                    title text,
+                    date int DEFAULT '0',
+                    PRIMARY KEY (lid)
+                );");
+                break;
+            default:
+                $db->write_query("
+                CREATE TABLE " . TABLE_PREFIX . "bankpipe_downloadlogs (
+                    lid int(8) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    pid int(10) NOT NULL DEFAULT '0',
+                    uid int(10) NOT NULL DEFAULT '0',
+                    aid int(10) NOT NULL DEFAULT '0',
+                    title text,
+                    date int(10) DEFAULT '0'
+                ) ENGINE=MyISAM{$collation};
+                ");
+                break;
+        }
+
+    }
+
+    if (!$db->table_exists('bankpipe_notifications')) {
+
+        $collation = $db->build_create_table_collation();
+
+        switch ($db->type) {
+            case 'pgsql':
+                $db->write_query("
+                CREATE TABLE " . TABLE_PREFIX . "bankpipe_notifications (
+                    nid serial,
+                    title text,
+                    description text,
+                    daysbefore int,
+                    method varchar(5),
+                    PRIMARY KEY (nid)
+                );");
+                break;
+            default:
+                $db->write_query("
+                CREATE TABLE " . TABLE_PREFIX . "bankpipe_notifications (
+                    nid int(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    title text,
+                    description text,
+                    daysbefore int(5),
+                    method varchar(5)
+                ) ENGINE=MyISAM{$collation};
+                ");
+                break;
+        }
+
+    }
+
+    if (!$db->table_exists('bankpipe_payments')) {
+
+        $collation = $db->build_create_table_collation();
+
+        switch ($db->type) {
+            case 'pgsql':
+                $db->write_query("
+                    CREATE TABLE " . TABLE_PREFIX . "bankpipe_payments (
+                    pid serial,
+                    uid int NOT NULL DEFAULT '0',
+                    merchant int NOT NULL DEFAULT '0',
+                    wallet text,
+                    payment_id varchar(32) NOT NULL DEFAULT '',
+                    sale text,
+                    refund text,
+                    email text,
+                    price decimal(6,2),
+                    payer_id varchar(32) NOT NULL DEFAULT '',
+                    country varchar(8) DEFAULT '',
+                    invoice varchar(32) NOT NULL DEFAULT '',
+                    bid int NOT NULL DEFAULT '0',
+                    date int DEFAULT '0',
+                    expires int DEFAULT '0',
+                    oldgid int DEFAULT '0',
+                    newgid int DEFAULT '0',
+                    sentnotification int DEFAULT '0',
+                    active smallint NOT NULL DEFAULT '1',
+                    fee decimal(6,2),
+                    currency varchar(3) DEFAULT '',
+                    crypto_price decimal(28,17),
+                    crypto_currency varchar(3) DEFAULT '',
+                    discounts text,
+                    type smallint NOT NULL,
+                    PRIMARY KEY (pid)
+                );");
+                $db->write_query("CREATE INDEX uid ON " . TABLE_PREFIX . "bankpipe_payments (uid);");
+                break;
+            default:
+                $db->write_query("
+                CREATE TABLE " . TABLE_PREFIX . "bankpipe_payments (
+                    pid int(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    uid int(10) NOT NULL DEFAULT '0',
+                    merchant int(10) NOT NULL DEFAULT '0',
+                    wallet text,
+                    payment_id varchar(32) NOT NULL DEFAULT '',
+                    sale text,
+                    refund text,
+                    email text,
+                    price decimal(6,2),
+                    payer_id varchar(32) NOT NULL DEFAULT '',
+                    country varchar(8) DEFAULT '',
+                    invoice varchar(32) NOT NULL DEFAULT '',
+                    bid int(10) NOT NULL DEFAULT '0',
+                    date int(10) DEFAULT '0',
+                    expires int(10) DEFAULT '0',
+                    oldgid int(5) DEFAULT '0',
+                    newgid int(5) DEFAULT '0',
+                    sentnotification int(5) DEFAULT '0',
+                    active tinyint(1) NOT NULL DEFAULT '1',
+                    fee decimal(6,2),
+                    currency varchar(3) DEFAULT '',
+                    crypto_price decimal(28,17),
+                    crypto_currency varchar(3) DEFAULT '',
+                    discounts text,
+                    type tinyint(1) NOT NULL,
+                    KEY uid (uid)
+                ) ENGINE=MyISAM{$collation};
+                ");
+                break;
+        }
+
+    }
+
+    if (!$db->table_exists('bankpipe_discounts')) {
+
+        $collation = $db->build_create_table_collation();
+
+        switch ($db->type) {
+            case 'pgsql':
+                $db->write_query("
+                CREATE TABLE " . TABLE_PREFIX . "bankpipe_discounts (
+                    did serial,
+                    bids text,
+                    uids text,
+                    gids text,
+                    name varchar(128) DEFAULT NULL,
+                    code text,
+                    value decimal(6,2) NOT NULL,
+                    type smallint DEFAULT '0',
+                    date int DEFAULT '0',
+                    expires int DEFAULT '0',
+                    stackable smallint DEFAULT '0',
+                    PRIMARY KEY (did)
+                );");
+                break;
+            default:
+                $db->write_query("
+                CREATE TABLE " . TABLE_PREFIX . "bankpipe_discounts (
+                    did int(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    bids text,
+                    uids text,
+                    gids text,
+                    name varchar(128) DEFAULT NULL,
+                    code text,
+                    value decimal(6,2) NOT NULL,
+                    type tinyint(1) NOT NULL DEFAULT '0',
+                    date int(10) DEFAULT '0',
+                    expires int(10) DEFAULT '0',
+                    stackable tinyint(1) DEFAULT '0'
+                ) ENGINE=MyISAM{$collation};
+                ");
+                break;
+        }
+
+    }
+
+    if (!$db->table_exists('bankpipe_wallets')) {
+
+        $collation = $db->build_create_table_collation();
+
+        switch ($db->type) {
+            case 'pgsql':
+                $db->write_query("
+                CREATE TABLE " . TABLE_PREFIX . "bankpipe_wallets (
+                    uid serial,
+                    PRIMARY KEY (uid)
+                );");
+                break;
+            default:
+                $db->write_query("
+                CREATE TABLE " . TABLE_PREFIX . "bankpipe_wallets (
+                    uid int(10) NOT NULL PRIMARY KEY
+                ) ENGINE=MyISAM{$collation};
+                ");
+                break;
+        }
+
+    }
+
+    if (!$db->table_exists('bankpipe_gateways')) {
+
+        $collation = $db->build_create_table_collation();
+
+        switch ($db->type) {
+            case 'pgsql':
+                $db->write_query("
+                CREATE TABLE " . TABLE_PREFIX . "bankpipe_gateways (
+                    gid serial,
+                    enabled smallint DEFAULT 0,
+                    name varchar(255) DEFAULT '',
+                    id varchar(255) DEFAULT '',
+                    secret varchar(255) DEFAULT '',
+                    wallet varchar(255) DEFAULT '',
+                    sandbox smallint DEFAULT 0,
+                    PRIMARY KEY (gid)
+                );");
+                break;
+            default:
+                $db->write_query("
+                CREATE TABLE " . TABLE_PREFIX . "bankpipe_gateways (
+                    gid int(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    enabled tinyint(1) DEFAULT 0,
+                    name varchar(255) DEFAULT '',
+                    id varchar(255) DEFAULT '',
+                    secret varchar(255) DEFAULT '',
+                    wallet varchar(255) DEFAULT '',
+                    sandbox tinyint(1) DEFAULT 0
+                ) ENGINE=MyISAM{$collation};
+                ");
+                break;
+        }
+
+    }
+
     $PL or require_once PLUGINLIBRARY;
 
     $settingsToAdd = [
-        'client_id' => [
-            'title' => $lang->setting_bankpipe_client_id,
-            'description' => $lang->setting_bankpipe_client_id_desc,
-            'optionscode' => 'text',
-            'value' => ''
-        ],
-        'client_secret' => [
-            'title' => $lang->setting_bankpipe_client_secret_subject,
-            'description' => $lang->setting_bankpipe_client_secret_desc,
-            'optionscode' => 'text',
-            'value' => ''
-        ],
-        'sandbox' => [
-            'title' => $lang->setting_bankpipe_sandbox,
-            'description' => $lang->setting_bankpipe_sandbox_desc,
-            'value' => 1
-        ],
-        'subscription_payee' => [
-            'title' => $lang->setting_bankpipe_subscription_payee,
-            'description' => $lang->setting_bankpipe_subscription_payee_desc,
-            'optionscode' => 'text',
-            'value' => ''
-        ],
         'currency' => [
             'title' => $lang->setting_bankpipe_currency,
             'description' => $lang->setting_bankpipe_currency_desc,
@@ -174,16 +476,17 @@ email=Email",
             'optionscode' => 'text',
             'value' => ''
         ],
-        'cart_mode' => [
-            'title' => $lang->setting_bankpipe_cart_mode,
-            'description' => $lang->setting_bankpipe_cart_mode_desc,
-            'value' => 1
-        ],
         'required_fields' => [
             'title' => $lang->setting_bankpipe_required_fields,
             'description' => $lang->setting_bankpipe_required_fields_desc,
             'optionscode' => 'text',
             'value' => ''
+        ],
+        'pending_payments_cleanup' => [
+            'title' => $lang->setting_bankpipe_pending_payments_cleanup,
+            'description' => $lang->setting_bankpipe_pending_payments_cleanup_desc,
+            'optionscode' => 'text',
+            'value' => '7'
         ]
 
     ];
@@ -192,140 +495,27 @@ email=Email",
 
     bankpipe_apply_attachment_edits(true);
 
-    // Add tables
-    if (!$db->table_exists('bankpipe_items')) {
+    $insert = [
+        [
+            'name' => 'PayPal'
+        ],
+        [
+            'name' => 'Coinbase'
+        ]
+    ];
 
-        $collation = $db->build_create_table_collation();
+    $db->insert_query_multiple('bankpipe_gateways', $insert);
 
-        $db->write_query("
-        CREATE TABLE " . TABLE_PREFIX . "bankpipe_items (
-            bid int(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            uid int(10) NOT NULL,
-            price decimal(6,2) NOT NULL,
-            gid int(10) NOT NULL DEFAULT '0',
-            aid int(10) NOT NULL DEFAULT '0',
-            email TEXT,
-            name varchar(128) DEFAULT NULL,
-            description varchar(128) DEFAULT NULL,
-            htmldescription text,
-            discount smallint(3) NOT NULL,
-            expires int(10) UNSIGNED NOT NULL DEFAULT '0',
-            primarygroup tinyint(1) NOT NULL DEFAULT '1',
-            expirygid int(5) NOT NULL DEFAULT '0',
-            type tinyint(1) NOT NULL,
-            KEY aid (aid)
-        ) ENGINE=MyISAM{$collation};
-        ");
-
+    switch ($db->type) {
+        case 'pgsql':
+            $db->add_column('forumpermissions', 'candownloadpaidattachments', "smallint DEFAULT 0");
+            $db->add_column('usergroups', 'candownloadpaidattachments', "smallint DEFAULT 0");
+            break;
+        default:
+            $db->add_column('forumpermissions', 'candownloadpaidattachments', "tinyint(1) DEFAULT 0");
+            $db->add_column('usergroups', 'candownloadpaidattachments', "tinyint(1) DEFAULT 0");
+            break;
     }
-    if (!$db->table_exists('bankpipe_log')) {
-
-        $collation = $db->build_create_table_collation();
-
-        $db->write_query("
-        CREATE TABLE " . TABLE_PREFIX . "bankpipe_log (
-            lid int(8) NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            invoice varchar(32) NOT NULL DEFAULT '',
-            type tinyint(1) NOT NULL,
-            bids text,
-            uid int(10) NOT NULL DEFAULT '0',
-            pid int(10) NOT NULL DEFAULT '0',
-            message text,
-            date int(10) NOT NULL DEFAULT '0'
-        ) ENGINE=MyISAM{$collation};
-        ");
-
-    }
-    if (!$db->table_exists('bankpipe_downloadlogs')) {
-
-        $collation = $db->build_create_table_collation();
-
-        $db->write_query("
-        CREATE TABLE " . TABLE_PREFIX . "bankpipe_downloadlogs (
-            lid int(8) NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            pid int(10) NOT NULL DEFAULT '0',
-            uid int(10) NOT NULL DEFAULT '0',
-            aid int(10) NOT NULL DEFAULT '0',
-            title text,
-            date int(10) NOT NULL DEFAULT '0'
-        ) ENGINE=MyISAM{$collation};
-        ");
-
-    }
-    if (!$db->table_exists('bankpipe_notifications')) {
-
-        $collation = $db->build_create_table_collation();
-
-        $db->write_query("
-        CREATE TABLE " . TABLE_PREFIX . "bankpipe_notifications (
-            nid int(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            title text,
-            description text,
-            daysbefore int(5) NOT NULL,
-            method varchar(5) NOT NULL DEFAULT ''
-        ) ENGINE=MyISAM{$collation};
-        ");
-
-    }
-    if (!$db->table_exists('bankpipe_payments')) {
-
-        $collation = $db->build_create_table_collation();
-
-        $db->write_query("
-        CREATE TABLE " . TABLE_PREFIX . "bankpipe_payments (
-            pid int(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            uid int(10) NOT NULL DEFAULT '0',
-            payee int(10) NOT NULL DEFAULT '0',
-            payee_email text,
-            payment_id varchar(32) NOT NULL DEFAULT '',
-            sale text,
-            refund text,
-            email text,
-            price decimal(6,2) NOT NULL,
-            payer_id varchar(32) NOT NULL DEFAULT '',
-            country varchar(8) NOT NULL DEFAULT '',
-            invoice varchar(32) NOT NULL DEFAULT '',
-            bid int(10) NOT NULL DEFAULT '0',
-            date int(10) NOT NULL DEFAULT '0',
-            expires int(10) UNSIGNED NOT NULL DEFAULT '0',
-            oldgid int(5) NOT NULL DEFAULT '0',
-            newgid int(5) NOT NULL DEFAULT '0',
-            sentnotification int(5) NOT NULL DEFAULT '0',
-            active tinyint(1) NOT NULL DEFAULT '1',
-            fee decimal(6,2) NOT NULL,
-            currency varchar(3) NOT NULL DEFAULT '',
-            discounts text,
-            type tinyint(1) NOT NULL,
-            KEY uid (uid)
-        ) ENGINE=MyISAM{$collation};
-        ");
-
-    }
-    if (!$db->table_exists('bankpipe_discounts')) {
-
-        $collation = $db->build_create_table_collation();
-
-        $db->write_query("
-        CREATE TABLE " . TABLE_PREFIX . "bankpipe_discounts (
-            did int(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            bids text,
-            uids text,
-            gids text,
-            name varchar(128) DEFAULT NULL,
-            code text,
-            value int(10) NOT NULL DEFAULT '0',
-            type tinyint(1) NOT NULL DEFAULT '0',
-            date int(10) NOT NULL DEFAULT '0',
-            expires int(10) UNSIGNED NOT NULL DEFAULT '0',
-            stackable tinyint(1) NOT NULL DEFAULT '0'
-        ) ENGINE=MyISAM{$collation};
-        ");
-
-    }
-
-    $db->add_column('users', 'payee', "text");
-    $db->add_column('forumpermissions', 'candownloadpaidattachments', "tinyint(1) DEFAULT 0");
-    $db->add_column('usergroups', 'candownloadpaidattachments', "tinyint(1) DEFAULT 0");
 
     // Add templates
     $dir       = new DirectoryIterator(dirname(__FILE__) . '/BankPipe/templates');
@@ -356,8 +546,6 @@ function bankpipe_uninstall()
 
     bankpipe_revert_attachment_edits(true);
 
-    $PL->settings_delete('bankpipe');
-
     // Drop tables
     $db->drop_table('bankpipe_log');
     $db->drop_table('bankpipe_notifications');
@@ -365,10 +553,8 @@ function bankpipe_uninstall()
     $db->drop_table('bankpipe_payments');
     $db->drop_table('bankpipe_downloadlogs');
     $db->drop_table('bankpipe_discounts');
-
-    if ($db->field_exists('payee', 'users')) {
-        $db->drop_column('users', 'payee');
-    }
+    $db->drop_table('bankpipe_wallets');
+    $db->drop_table('bankpipe_gateways');
 
     if ($db->field_exists('candownloadpaidattachments', 'forumpermissions')) {
         $db->drop_column('forumpermissions', 'candownloadpaidattachments');
@@ -377,6 +563,8 @@ function bankpipe_uninstall()
     if ($db->field_exists('candownloadpaidattachments', 'usergroups')) {
         $db->drop_column('usergroups', 'candownloadpaidattachments');
     }
+
+    $PL->settings_delete('bankpipe');
 
     // Drop templates
     $PL->templates_delete('bankpipe');
@@ -395,11 +583,11 @@ function bankpipe_activate()
     // Create new task to check updates to users
     if (!$db->fetch_array($db->simple_select('tasks', '*', "file = 'bankpipe'"))) {
         $new_task = [
-            "title" => 'BankPipe Subscriptions Cleanup',
-            "description" => 'Checks for expired subscriptions and sends notifications.',
+            "title" => 'BankPipe cleanup',
+            "description" => 'Wipes expired items or those pending for too long, sends expiry notifications.',
             "file" => 'bankpipe',
-            "minute" => '30,59',
-            "hour" => '*',
+            "minute" => '0',
+            "hour" => '0',
             "day" => '*',
             "month" => '*',
             "weekday" => '*',
@@ -550,41 +738,37 @@ function bankpipe_revert_attachment_edits($apply = false)
 
 global $mybb;
 
-if ($mybb->settings['bankpipe_client_id'] and $mybb->settings['bankpipe_client_secret']) {
+$plugins->add_hook('global_start', 'bankpipe_global_start');
+$plugins->add_hook('global_intermediate', 'bankpipe_header_link');
 
-    $plugins->add_hook('global_start', 'bankpipe_global_start');
-    $plugins->add_hook('global_intermediate', 'bankpipe_header_link');
+// UserCP
+$plugins->add_hook('usercp_menu', 'bankpipe_nav');
+$plugins->add_hook('usercp_start', 'bankpipe_panel');
 
-    // UserCP
-    $plugins->add_hook('usercp_menu', 'bankpipe_nav');
-    $plugins->add_hook('usercp_start', 'bankpipe_panel');
+// Attachments
+$plugins->add_hook('postbit_attachment', 'bankpipe_attachments_postbit');
+$plugins->add_hook('editpost_action_start', 'bankpipe_edit_attachments');
+$plugins->add_hook('newthread_start', 'bankpipe_edit_attachments');
+$plugins->add_hook('newreply_start', 'bankpipe_edit_attachments');
 
-    // Attachments
-    $plugins->add_hook('postbit_attachment', 'bankpipe_attachments_postbit');
-    $plugins->add_hook('editpost_action_start', 'bankpipe_edit_attachments');
-    $plugins->add_hook('newthread_start', 'bankpipe_edit_attachments');
-    $plugins->add_hook('newreply_start', 'bankpipe_edit_attachments');
-
-    if ($mybb->version_code > 1818) {
-        $plugins->add_hook('bankpipe_core_add_attachment', 'bankpipe_update_paid_attachment');
-    }
-
-    $plugins->add_hook('editpost_do_editpost_start', 'bankpipe_save_paid_item');
-    $plugins->add_hook('newreply_do_newreply_start', 'bankpipe_save_paid_item');
-    $plugins->add_hook('newthread_do_newthread_start', 'bankpipe_save_paid_item');
-    $plugins->add_hook('pre_output_page', 'bankpipe_pre_output_page');
-
-    $plugins->add_hook('attachment_start', 'bankpipe_attachment_start');
-    $plugins->add_hook('attachment_end', 'bankpipe_attachment_end');
-    $plugins->add_hook('remove_attachment_do_delete', 'bankpipe_delete_attachment');
-
-    // Xmlhttp
-    $plugins->add_hook('xmlhttp', 'bankpipe_xmlhttp_get_items');
-
-    // Profile
-    $plugins->add_hook('member_profile_end', 'bankpipe_profile');
-
+if ($mybb->version_code > 1818) {
+    $plugins->add_hook('bankpipe_core_add_attachment', 'bankpipe_update_paid_attachment');
 }
+
+$plugins->add_hook('editpost_do_editpost_start', 'bankpipe_save_paid_item');
+$plugins->add_hook('newreply_do_newreply_start', 'bankpipe_save_paid_item');
+$plugins->add_hook('newthread_do_newthread_start', 'bankpipe_save_paid_item');
+$plugins->add_hook('pre_output_page', 'bankpipe_pre_output_page');
+
+$plugins->add_hook('attachment_start', 'bankpipe_attachment_start');
+$plugins->add_hook('attachment_end', 'bankpipe_attachment_end');
+$plugins->add_hook('remove_attachment_do_delete', 'bankpipe_delete_attachment');
+
+// Xmlhttp
+$plugins->add_hook('xmlhttp', 'bankpipe_xmlhttp_get_items');
+
+// Profile
+$plugins->add_hook('member_profile_end', 'bankpipe_profile');
 
 // AdminCP
 if (defined('IN_ADMINCP')) {
@@ -609,6 +793,9 @@ if (defined('IN_ADMINCP')) {
     $plugins->add_hook("admin_user_groups_edit_graph_tabs", "bankpipe_usergroups_tab");
     $plugins->add_hook("admin_user_groups_edit_graph", "bankpipe_edit_graph");
     $plugins->add_hook("admin_user_groups_edit_commit", "bankpipe_update_group_permissions");
+
+    // Merge accounts
+    $plugins->add_hook("admin_user_users_merge_commit", "bankpipe_merge_accounts");
 
 }
 
@@ -659,23 +846,22 @@ function bankpipe_global_start()
 
         if ($mybb->input['action'] == 'subscriptions') {
             $templatelist[] = 'bankpipe_script';
-            $templatelist[] = 'bankpipe_subscriptions_subscription_price_discounted';
-            $templatelist[] = 'bankpipe_subscriptions_subscription_price';
-            $templatelist[] = 'bankpipe_subscriptions_subscription_purchased';
             $templatelist[] = 'bankpipe_subscriptions_subscription';
+            $templatelist[] = 'bankpipe_subscriptions_subscription_added';
+            $templatelist[] = 'bankpipe_subscriptions_subscription_purchased';
             $templatelist[] = 'bankpipe_subscriptions_no_subscriptions';
             $templatelist[] = 'bankpipe_subscriptions';
-            $templatelist[] = 'bankpipe_discounts';
-            $templatelist[] = 'bankpipe_discounts_code';
         }
 
         if ($mybb->input['action'] == 'purchases') {
             $templatelist[] = 'bankpipe_purchases_payment';
             $templatelist[] = 'bankpipe_purchases_payment_item';
             $templatelist[] = 'bankpipe_purchases_payment_discounts';
+            $templatelist[] = 'bankpipe_purchases_payment_pending';
             $templatelist[] = 'bankpipe_purchases_purchase_refunded';
             $templatelist[] = 'bankpipe_purchases_purchase_expired';
             $templatelist[] = 'bankpipe_purchases_purchase_inactive';
+            $templatelist[] = 'bankpipe_purchases_purchase_pending';
             $templatelist[] = 'bankpipe_purchases_purchase';
             $templatelist[] = 'bankpipe_purchases_no_purchases';
             $templatelist[] = 'bankpipe_purchases';
@@ -684,6 +870,7 @@ function bankpipe_global_start()
         if ($mybb->input['action'] == 'manage') {
             $templatelist[] = 'bankpipe_manage_items_item';
             $templatelist[] = 'bankpipe_manage_items';
+            $templatelist[] = 'bankpipe_manage_wallet';
             $templatelist[] = 'bankpipe_manage_items_no_items';
             $templatelist[] = 'bankpipe_manage';
             $templatelist[] = 'attachment_icon';
@@ -691,6 +878,7 @@ function bankpipe_global_start()
 
         if ($mybb->input['action'] == 'cart') {
             $templatelist[] = 'bankpipe_script';
+            $templatelist[] = 'bankpipe_payment_method';
             $templatelist[] = 'bankpipe_discounts';
             $templatelist[] = 'bankpipe_discounts_code';
             $templatelist[] = 'bankpipe_cart_item';
@@ -702,7 +890,6 @@ function bankpipe_global_start()
 
         $templatelist[] = 'bankpipe_nav';
         $templatelist[] = 'bankpipe_nav_manage';
-        $templatelist[] = 'bankpipe_nav_cart';
 
     }
 
@@ -722,6 +909,7 @@ function bankpipe_global_start()
         $templatelist[] = 'bankpipe_purchases_purchase_refunded';
         $templatelist[] = 'bankpipe_purchases_purchase_expired';
         $templatelist[] = 'bankpipe_purchases_purchase_inactive';
+        $templatelist[] = 'bankpipe_purchases_purchase_pending';
         $templatelist[] = 'bankpipe_purchases_purchase';
         $templatelist[] = 'bankpipe_purchases_no_purchases';
         $templatelist[] = 'bankpipe_purchases';
@@ -739,9 +927,9 @@ function bankpipe_global_start()
 
 function bankpipe_header_link()
 {
-    global $mybb, $templates, $lang, $cart;
+    global $mybb, $templates, $lang, $cart, $cartItems;
 
-    if (!$mybb->settings['bankpipe_cart_mode'] or !(new Permissions)->simpleCheck(['view'])) {
+    if (!(new Permissions)->simpleCheck(['view'])) {
         return false;
     }
 
@@ -768,13 +956,7 @@ function bankpipe_nav()
         eval("\$manage = \"".$templates->get("bankpipe_nav_manage")."\";");
     }
 
-    if ($mybb->settings['bankpipe_cart_mode']) {
-
-        $cartItems = count((new Cookies)->read('items'));
-
-        eval("\$cart = \"".$templates->get("bankpipe_nav_cart")."\";");
-
-    }
+    $cartItems = count((new Cookies)->read('items'));
 
     eval("\$usercpmenu .= \"".$templates->get("bankpipe_nav")."\";");
 }
@@ -788,11 +970,7 @@ function bankpipe_edit_attachments()
 {
     global $templates, $db, $mybb, $forumpermissions, $attachedfile, $pid, $tid, $fid, $items, $plugins;
 
-    if (!$mybb->settings['bankpipe_third_party']) {
-        return false;
-    }
-
-    if (!(new Permissions)->simpleCheck([], $fid) or !$mybb->user['payee']) {
+    if (!$mybb->settings['bankpipe_third_party'] or !(new Permissions)->simpleCheck([], $fid)) {
         return false;
     }
 
@@ -895,7 +1073,7 @@ function bankpipe_update_paid_attachment($args)
 {
     global $templates, $db, $mybb, $fid, $pid, $plugins;
 
-    if (!(new Permissions)->simpleCheck([], $fid) or !$mybb->user['payee']) {
+    if (!(new Permissions)->simpleCheck([], $fid)) {
         return false;
     }
 
@@ -932,7 +1110,7 @@ function bankpipe_update_paid_attachment($args)
 
 function bankpipe_attachments_postbit($data)
 {
-    global $mybb, $templates, $currentAttachment, $attachcache, $orders, $plugins, $payments, $items, $cookies;
+    global $mybb, $db, $templates, $currentAttachment, $attachcache, $orders, $plugins, $payments, $items, $cookies, $gateways;
 
     if (!$orders) {
         $orders = new Orders;
@@ -954,6 +1132,13 @@ function bankpipe_attachments_postbit($data)
         }
 
     };
+
+    // Cache gateways
+    $gateways = [];
+    $query = $db->simple_select('bankpipe_gateways', '*');
+    while ($gateway = $db->fetch_array($query)) {
+        $gateways[] = $gateway;
+    }
 
     // Cache this thread attachments
     $items = (new Items)->getAttachments($search);
@@ -996,7 +1181,8 @@ function bankpipe_hijack_templates($title)
         return $title;
     }
 
-    global $currentAttachment, $paidAttachment, $db, $mybb, $showPayments, $lang, $forumpermissions, $items, $plugins, $payments, $cookies;
+    global $currentAttachment, $paidAttachment, $db, $mybb, $showPayments, $lang, $forumpermissions;
+    global $items, $plugins, $payments, $cookies, $gateways, $templates, $buyButtons;
 
     $plugins->run_hooks('bankpipe_hijack_templates_start');
 
@@ -1010,6 +1196,7 @@ function bankpipe_hijack_templates($title)
 
     $key = array_search($currentAttachment['aid'], array_column($items, 'aid', 'bid'));
     $paidAttachment = $items[$key];
+    $paidAttachment['price'] += 0;
 
     // This attachment is paid
     if ($paidAttachment['aid']) {
@@ -1033,20 +1220,13 @@ function bankpipe_hijack_templates($title)
 
             $showPayments = true;
 
-            if ($mybb->settings['bankpipe_cart_mode']) {
+            $itemsInCart = $cookies->read('items');
 
-                $existingItems = $cookies->read('items');
-
-                if (in_array($paidAttachment['aid'], $existingItems)) {
-                    return 'bankpipe_' . $title . '_cart_added';
-                }
-                else {
-                    return 'bankpipe_' . $title . '_cart';
-                }
-
+            if (in_array($paidAttachment['bid'], $itemsInCart)) {
+                return 'bankpipe_' . $title . '_cart_added';
             }
             else {
-                return 'bankpipe_' . $title;
+                return 'bankpipe_' . $title . '_cart';
             }
 
         }
@@ -1084,7 +1264,7 @@ function bankpipe_profile()
 
     if ($mybb->usergroup['cancp']) {
 
-        $purchases = $inactive = $refunded = $expired = '';
+        $purchases = $inactive = $refunded = $pending = $expired = '';
 
         $exclude = [Orders::CREATE, Orders::ERROR, Orders::MANUAL];
         $orders = (new Orders)->get([
@@ -1104,6 +1284,9 @@ function bankpipe_profile()
 
                 if ($order['refund']) {
                     eval("\$refunded .= \"".$templates->get("bankpipe_purchases_purchase_refunded")."\";");
+                }
+                else if ($order['type'] == Orders::PENDING) {
+                    eval("\$pending .= \"".$templates->get("bankpipe_purchases_purchase_pending")."\";");
                 }
                 else if ($order['expires'] and $order['expires'] < TIME_NOW and !$order['active']) {
                     eval("\$expired .= \"".$templates->get("bankpipe_purchases_purchase_expired")."\";");
@@ -1132,7 +1315,7 @@ function bankpipe_attachment_start()
 {
     global $mybb, $attachment, $item, $payments;
 
-    if ($mybb->user['uid'] == 0) {
+    if ($mybb->user['uid'] == 0 or $attachment['aid'] == 0) {
         return false;
     }
 
@@ -1286,7 +1469,7 @@ function bankpipe_save_paid_item()
 
         foreach ($mybb->input['paidattachs'] as $aid => $item) {
 
-            if ($aid == 'update') {
+            if ($aid == 'update' or !$item['price'] or $item['price'] <= 0) {
                 continue;
             }
 
@@ -1504,6 +1687,17 @@ function bankpipe_forumpermissions(&$groups)
     $groups['candownloadpaidattachments'] = 'viewing';
 
     return $groups;
+}
+
+function bankpipe_merge_accounts()
+{
+    global $db, $uid_update, $source_user;
+
+    $db->update_query('bankpipe_logs', $uid_update, "uid='{$source_user['uid']}'");
+    $db->update_query('bankpipe_items', $uid_update, "uid='{$source_user['uid']}'");
+    $db->update_query('bankpipe_payments', $uid_update, "uid='{$source_user['uid']}'");
+    $db->update_query('bankpipe_downloadlogs', $uid_update, "uid='{$source_user['uid']}'");
+    $db->update_query('bankpipe_wallets', $uid_update, "uid='{$source_user['uid']}'");
 }
 
 if (!function_exists('control_object')) {
