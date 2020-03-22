@@ -45,12 +45,12 @@ class History
             if ($this->mybb->input['username']) {
 
                 $uids = [];
-                $query = $this->db->simple_select('users', 'uid', "username LIKE ('" . $this->db->escape_string($this->mybb->input['username']) . "')");
+                $query = $this->db->simple_select('users', 'uid', "username LIKE '%" . $this->db->escape_string($this->mybb->input['username']) . "%'");
                 while ($uid = $this->db->fetch_field($query, 'uid')) {
                     $uids[] = $uid;
                 }
 
-                $where[] = "uid IN ('" . implode("','", $uids) . "')";
+                $where[] = "(uid IN ('" . implode("','", $uids) . "') OR donor IN ('" . implode("','", $uids) . "'))";
 
             }
 
@@ -117,8 +117,9 @@ class History
         // Cache users
         $users = [];
         $uids = Core::normalizeArray(array_merge(
-            array_column($orders, 'buyer'),
-            array_column($orders, 'merchant')
+            array_column($orders, 'uid'),
+            array_column($orders, 'merchant'),
+            array_column($orders, 'donor')
         ));
         $query = $this->db->simple_select('users', 'username, usergroup, displaygroup, avatar, uid', "uid IN ('" . implode("','", $uids) . "')");
         while ($user = $this->db->fetch_array($query)) {
@@ -132,13 +133,25 @@ class History
             $revenue[$order['currency_code']] += $totalPaid;
 
             // Buyer
-            $user = $users[$order['buyer']];
+            $user = ($order['donor']) ? $users[$order['donor']] : $users[$order['uid']];
             $username = format_name($user['username'], $user['usergroup'], $user['displaygroup']);
             $username = build_profile_link($username, $user['uid']);
 
             $avatar = format_avatar($user['avatar']);
 
-            $table->construct_cell('<img src="' . $avatar['image'] . '" style="height: 20px; width: 20px; vertical-align: middle" /> ' . $username);
+            // Add donation info
+            $donation = '';
+            if ($order['donor']) {
+
+                $gifted = $users[$order['uid']];
+                $giftedUsername = format_name($gifted['username'], $gifted['usergroup'], $gifted['displaygroup']);
+                $giftedUsername = build_profile_link($giftedUsername, $gifted['uid']);
+
+                $donation = $this->lang->bankpipe_history_gifted_to . $giftedUsername;
+
+            }
+
+            $table->construct_cell('<img src="' . $avatar['image'] . '" style="height: 20px; width: 20px; vertical-align: middle" /> ' . $username . $donation);
 
             // Merchant
             if ($order['merchant']) {
@@ -225,7 +238,7 @@ class History
         if (count($orders) == 0) {
             $table->construct_cell(
                 $this->lang->bankpipe_history_no_payments,
-                ['colspan' => 5, 'style' => 'text-align: center']
+                ['colspan' => 7, 'style' => 'text-align: center']
             );
             $table->construct_row();
         }
@@ -248,7 +261,38 @@ class History
 
         }
 
+        // Total revenue
+        if ($numResults > $perpage) {
+
+            $revenue = [];
+            $query = $this->db->simple_select(Items::PAYMENTS_TABLE, 'SUM(price) AS total, SUM(fee) AS fees, currency', '', ['group_by' => 'currency']);
+            while ($rev = $this->db->fetch_array($query)) {
+                $revenue[$rev['currency']] = $rev['total'] - $rev['fees'];
+            }
+
+            if ($revenue) {
+
+                $html = [];
+                foreach ($revenue as $curr => $amount) {
+                    $html[] = $amount . ' ' . Core::friendlyCurrency($curr);
+                }
+
+                $table->construct_cell(
+                    $this->lang->sprintf(
+                        $this->lang->bankpipe_history_total_revenue,
+                        implode(', ', $html)
+                    ),
+                    ['colspan' => 7, 'style' => 'text-align: center']
+                );
+                $table->construct_row();
+            }
+
+        }
+
         $table->output($this->lang->bankpipe_history);
+
+        // Adjust date format to the board's one
+        $format = get_datepicker_format();
 
         echo <<<HTML
 <style type="text/css">
@@ -273,7 +317,7 @@ class History
 // Date picking
 var expiry = $("#startingdate, #endingdate").datepicker({
     autoHide: true,
-    format: 'dd/mm/yyyy'
+    format: '$format'
 })
 -->
 </script>

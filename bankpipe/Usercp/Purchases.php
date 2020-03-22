@@ -27,7 +27,12 @@ class Purchases extends Usercp
 
             $order = reset($ordersHandler->get([
                 'invoice' => $invoice,
-                'uid' => $this->mybb->user['uid']
+                'uid' => $this->mybb->user['uid'],
+                'donor' => 0,
+                'OR' => [
+                    'invoice' => $invoice,
+                    'donor' => $this->mybb->user['uid']
+                ]
             ], [
                 'includeItemsInfo' => true
             ]));
@@ -80,7 +85,7 @@ class Purchases extends Usercp
                         while ($item = $this->db->fetch_array($query)) {
                             $names[] = ($item['name']) ? $item['name'] : $item['code'];
                         }
-                        
+
                         // Previous subscription discount?
                         if (in_array('p', $discounts)) {
                             $names[] = $this->lang->bankpipe_purchases_previous_subscription_discount;
@@ -89,6 +94,15 @@ class Purchases extends Usercp
                         $names = implode(', ', $names);
 
                         eval("\$appliedDiscounts = \"".$templates->get("bankpipe_purchases_payment_discounts")."\";");
+
+                    }
+
+                    // Show eventual gift
+                    if ($order['donor']) {
+
+                        $gifted = get_user($order['uid']);
+
+                        eval("\$giftTo = \"".$templates->get("bankpipe_purchases_payment_gift_to")."\";");
 
                     }
 
@@ -118,7 +132,11 @@ class Purchases extends Usercp
         $exclude = [Orders::CREATE, Orders::ERROR, Orders::MANUAL];
         $orders = $ordersHandler->get([
             'type NOT IN (' . implode(',', $exclude) . ')',
-            'uid' => $this->mybb->user['uid']
+            'uid' => $this->mybb->user['uid'],
+            'donor' => 0,
+            'OR' => [
+                'donor' => $this->mybb->user['uid']
+            ]
         ], [
             'includeItemsInfo' => true
         ]);

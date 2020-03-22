@@ -7,6 +7,7 @@ include './bankpipe/autoload.php';
 
 use BankPipe\Messages\Handler as Messages;
 use BankPipe\Items\Orders;
+use BankPipe\Items\Items;
 use BankPipe\Core;
 use BankPipe\Logs\Handler as Logs;
 use BankPipe\Helper\Cookies;
@@ -50,7 +51,7 @@ if ($mybb->input['action'] == 'cancel') {
 
     }
 
-    if ($selectedOrder['buyer'] != $mybb->user['uid'] or $selectedOrder['type'] != Orders::CREATE) {
+    if ($selectedOrder['uid'] != $mybb->user['uid'] or $selectedOrder['type'] != Orders::CREATE) {
 
         $messages->error([
             $lang->bankpipe_error_cannot_cancel_order
@@ -162,6 +163,17 @@ if ($mybb->input['action'] == 'authorize') {
         $parameters['merchant'] = $first['uid'];
     }
 
+    // Gift to user?
+    if ($mybb->input['gift']) {
+
+        $receiver = get_user_by_username($mybb->input['gift']);
+
+        if ($receiver['uid']) {
+            $parameters['gift'] = $receiver['uid'];
+        }
+
+    }
+
     $args = [&$parameters, &$items];
     $plugins->run_hooks('bankpipe_authorize_before', $args);
 
@@ -226,6 +238,96 @@ if ($mybb->input['action'] == 'complete') {
     }
 
     $messages->display($message, 'popup');
+
+}
+
+if (!$mybb->input['action']) {
+
+    $gateways = [];
+    $query = $db->simple_select('bankpipe_gateways', '*');
+    while ($gateway = $db->fetch_array($query)) {
+        $gateways[] = $gateway;
+    }
+
+    $plugins->run_hooks('bankpipe_page_subscriptions_start');
+
+    add_breadcrumb($lang->bankpipe_nav, 'bankpipe.php');
+
+    $cookies = new Cookies;
+
+    $currency = Core::friendlyCurrency($mybb->settings['bankpipe_currency']);
+
+    eval("\$script = \"".$templates->get("bankpipe_script")."\";");
+
+    $highestPurchased = $subs = $purchases = [];
+
+    $query = $db->simple_select(Items::PAYMENTS_TABLE, 'bid, invoice', 'active = 1 AND uid = ' . (int) $mybb->user['uid']);
+    while ($purchase = $db->fetch_array($query)) {
+        $purchases[$purchase['bid']] = $purchase['invoice'];
+    }
+
+    $query = $db->simple_select(Items::ITEMS_TABLE, '*', 'type = ' . Items::SUBSCRIPTION, ['order_by' => 'price ASC']);
+    while ($subscription = $db->fetch_array($query)) {
+
+        $subscription['price'] += 0;
+
+        // Determine highest purchased subscription
+        if ($purchases[$subscription['bid']]) {
+            $highestPurchased = $subscription;
+        }
+
+        $subs[] = $subscription;
+
+    }
+
+    if ($subs) {
+
+        foreach ($subs as $subscription) {
+
+            $skip = false;
+
+            // Bought or not?
+            if ($purchases[$subscription['bid']] and $highestPurchased['bid'] == $subscription['bid']) {
+
+                $paymentId = $purchases[$subscription['bid']];
+                eval("\$subscriptions .= \"".$templates->get("bankpipe_subscriptions_subscription_purchased")."\";");
+
+            }
+            else {
+
+                $itemsInCart = $cookies->read('items');
+
+                if (in_array($subscription['bid'], $itemsInCart)) {
+                    eval("\$subscriptions .= \"".$templates->get("bankpipe_subscriptions_subscription_added")."\";");
+                }
+                else {
+
+                    $allowed = array_filter(explode(',', $subscription['permittedgroups']));
+                    $groupsToCheck = (array) explode(',', $mybb->user['additionalgroups']);
+                    $groupsToCheck[] = $mybb->user['usergroup'];
+
+                    if (!$mybb->user['uid'] or ($allowed and !array_intersect($groupsToCheck, $allowed))) {
+                        eval("\$subscriptions .= \"".$templates->get("bankpipe_subscriptions_subscription_not_allowed")."\";");
+                    }
+                    else {
+                        eval("\$subscriptions .= \"".$templates->get("bankpipe_subscriptions_subscription")."\";");
+                    }
+
+                }
+
+            }
+
+        }
+
+    }
+    else {
+        eval("\$subscriptions = \"".$templates->get("bankpipe_subscriptions_no_subscription")."\";");
+    }
+
+    $plugins->run_hooks('bankpipe_page_subscriptions_end');
+
+    eval("\$upgrade = \"" . $templates->get("bankpipe_subscriptions") . "\";");
+    output_page($upgrade);
 
 }
 

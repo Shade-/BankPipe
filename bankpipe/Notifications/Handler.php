@@ -16,7 +16,7 @@ class Handler
 
     public function __construct()
     {
-        $this->traitConstruct();
+        $this->traitConstruct(['cache']);
 
         $this->sendEmail = ($this->mybb->settings['bankpipe_admin_notification_method'] != 'pm');
 
@@ -101,43 +101,43 @@ class Handler
                 -1;
 
             foreach ($this->queue as $queuedElement) {
-                
+
                 $pm = [
                     "subject" => $queuedElement['title'],
                     "message" => $queuedElement['message'],
                     "fromid" => $sender,
                     "toid" => $queuedElement['receivers']
                 ];
-    
+
                 $this->pm->set_data($pm);
-    
+
                 if ($this->pm->validate_pm()) {
                     $this->pm->insert_pm();
                 }
-            
+
             }
 
         }
         else {
 
             $queue = $emails = [];
-            
+
             foreach ($this->queue as $queuedElement) {
 
                 // Get user emails
                 $query = $this->db->simple_select('users', 'uid, email', 'uid IN (' . implode(',', $queuedElement['receivers']) . ')');
                 while ($user = $this->db->fetch_array($query)) {
-    
+
                     if ($user['email']) {
                         $emails[$user['uid']] = $user['email'];
                     }
-    
+
                 }
-    
+
                 foreach ($queuedElement['receivers'] as $uid) {
-    
+
                     if ($emails[$uid]) {
-    
+
                         $queue[] = [
                             "mailto" => $this->db->escape_string($emails[$uid]),
                             "mailfrom" => '',
@@ -145,11 +145,11 @@ class Handler
                             "message" => $this->db->escape_string($queuedElement['message']),
                             "headers" => ''
                         ];
-    
+
                     }
-    
+
                 }
-            
+
             }
 
             if (!empty($queue)) {

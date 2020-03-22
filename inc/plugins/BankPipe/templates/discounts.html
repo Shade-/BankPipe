@@ -1,7 +1,9 @@
-<tr class="buy-area">
+<tr>
 	<td class="trow1" colspan="3">
-		<form action="usercp.php" method="post" style="text-align: center" class="discounts">
-			<input type="text" class="textbox" style="width: 400px" name="code" placeholder="{$this->lang->bankpipe_discounts_promo_code}" value="" />
+		<span><b>{$this->lang->bankpipe_discounts_discount}</b></span><br>
+		<span class="smalltext">{$this->lang->bankpipe_discounts_discount_desc}</span><br><br>
+		<form action="usercp.php" method="post" class="discounts applyDiscounts">
+			<input type="text" class="textbox" name="code" placeholder="{$this->lang->bankpipe_discounts_promo_code}" value="" />
 			<input type="submit" class="button" value="{$this->lang->bankpipe_discounts_apply}" />
 			<input type="hidden" name="action" value="discounts" />
             <input type="hidden" name="env" value="bankpipe" />

@@ -30,6 +30,9 @@
             add: 'add',
             remove: 'remove'
         },
+		links: {
+			cart: 'usercp.php?action=cart&env=bankpipe'
+		},
         currency: 'EUR',
         cartItems: 0,
         popupClosedAutomatically: false,
@@ -72,10 +75,7 @@
 
                 var data = {};
 
-				data.gateway = $(this).data('gateway');
-				if (!data.gateway) {
-					data.gateway = 'Coinbase';
-				}
+				data.gateway = $(this).data('gateway') || 'Coinbase';
 
                 overlay.fadeIn(BankPipe.overlayAnimationSpeed);
 
@@ -93,6 +93,19 @@
                     });
 
                 }
+
+                // Get eventual extra fields
+                $.each($('.includeInRequest'), function() {
+
+                    var input = $(this);
+                    var val = input.val();
+                    var name = input.attr('name');
+                    
+                    if (name) {
+                        data[name] = val;
+                    }
+
+                });
 
                 var callback = function(response) {
 
@@ -169,13 +182,20 @@
                     var itemsCount = itemsInCart.length;
 
                     if (response.message) {
+						
+						var location = btn.attr('href');
 
                         if (response.action == 'add') {
+							
+							// Fast checkout
+							if (btn.hasClass('fastCheckout')) {
+								return window.location.href = BankPipe.links.prefix + BankPipe.links.cart;
+							}
 
                             btn.text(BankPipe.lang.removeFromCart)
                                 .removeClass(BankPipe.classes.add)
                                 .addClass(BankPipe.classes.remove)
-                                .attr('href', btn.attr('href').replace('add=1', 'remove=1'));
+                                .attr('href', location.replace('add=1', 'remove=1'));
 
                         }
                         else {
@@ -191,7 +211,7 @@
                                 btn.text(BankPipe.lang.addToCart)
                                     .removeClass(BankPipe.classes.remove)
                                     .addClass(BankPipe.classes.add)
-                                    .attr('href', btn.attr('href').replace('remove=1', 'add=1'));
+                                    .attr('href', location.replace('remove=1', 'add=1'));
 
                             }
 

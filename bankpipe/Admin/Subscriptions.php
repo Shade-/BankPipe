@@ -3,6 +3,7 @@
 namespace BankPipe\Admin;
 
 use BankPipe\Items\Items;
+use BankPipe\Core;
 
 class Subscriptions
 {
@@ -56,6 +57,8 @@ class Subscriptions
 
                 $this->mybb->input['discount'] = (int) $this->mybb->input['discount'];
                 $this->mybb->input['expires'] = (int) $this->mybb->input['expires'];
+                $this->mybb->input['gid'] = $this->mybb->input['usergroups'];
+                $this->mybb->input['permittedgroups'] = $this->mybb->input['permittedgroups']; // Not a mistake. If it's !isset(), it can't be changed.
 
                 $items->insert([$this->mybb->input]);
 
@@ -75,6 +78,8 @@ class Subscriptions
             }
 
         }
+
+        $currency = Core::friendlyCurrency($this->mybb->settings['bankpipe_currency']);
 
         $title = ($bid) ?
             $this->lang->sprintf($this->lang->bankpipe_edit_subscription, $subscription['name']) :
@@ -141,7 +146,7 @@ class Subscriptions
         );
 
         $container->output_row(
-            $this->lang->bankpipe_subscriptions_price,
+            $this->lang->sprintf($this->lang->bankpipe_subscriptions_price, $currency),
             $this->lang->bankpipe_subscriptions_price_desc,
             $form->generate_text_box('price', $this->mybb->input['price'], [
                 'id' => 'price'
@@ -152,18 +157,22 @@ class Subscriptions
         // Subscription usergroup
         $subusergroups = [];
 
-        $groups_cache = $this->cache->read('usergroups');
-        unset($groups_cache[1]); // 1 = guests. Exclude them
+        $permissionsGroupsCache = $groupsCache = $this->cache->read('usergroups');
+        unset($groupsCache[1]); // 1 = guests. Exclude them
 
-        foreach ($groups_cache as $group) {
+        foreach ($groupsCache as $group) {
             $subusergroups[$group['gid']] = $group['title'];
         }
+        
+        // Default value
+        $selectedGroups = explode(',', $this->mybb->input['gid']);
 
         $container->output_row(
             $this->lang->bankpipe_subscriptions_usergroup,
             $this->lang->bankpipe_subscriptions_usergroup_desc,
-            $form->generate_select_box('gid', $subusergroups, [$this->mybb->input['gid']], [
-                'id' => 'gid'
+            $form->generate_select_box('usergroups[]', $subusergroups, $selectedGroups, [
+                'id' => 'usergroups',
+                'multiple' => true
             ])
         );
 
@@ -180,7 +189,26 @@ class Subscriptions
                 'id' => 'discount'
             ])
         );
+        
+        // Permissions
+        $permissionsGroups = [];
+        foreach ($permissionsGroupsCache as $group) {
+            $permissionsGroups[$group['gid']] = $group['title'];
+        }
+        
+        // Default value
+        $selectedGroups = explode(',', $this->mybb->input['permittedgroups']);
 
+        $container->output_row(
+            $this->lang->bankpipe_subscriptions_permitted_usergroups,
+            $this->lang->bankpipe_subscriptions_permitted_usergroups_desc,
+            $form->generate_select_box('permittedgroups[]', $permissionsGroups, $selectedGroups, [
+                'id' => 'permittedgroups',
+                'multiple' => true
+            ])
+        );
+
+        // Expiration date
         $container->output_row(
             $this->lang->bankpipe_subscriptions_expires,
             $this->lang->bankpipe_subscriptions_expires_desc,
@@ -194,7 +222,7 @@ class Subscriptions
             $this->lang->bankpipe_subscriptions_use_default_usergroup
         ];
 
-        foreach ($groups_cache as $group) {
+        foreach ($groupsCache as $group) {
             $expirygid[$group['gid']] = $group['title'];
         }
 

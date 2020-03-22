@@ -12,7 +12,7 @@ class Usercp
     {
         $this->traitConstruct();
 
-        $allowedPages = ['subscriptions', 'cart', 'purchases', 'manage', 'discounts'];
+        $allowedPages = ['cart', 'purchases', 'manage', 'discounts'];
 
         $args = [&$this, &$allowedPages];
         $this->plugins->run_hooks('bankpipe_ucp_main', $args);

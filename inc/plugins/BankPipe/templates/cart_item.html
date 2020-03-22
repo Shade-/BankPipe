@@ -1,10 +1,12 @@
 <tr class="item" data-bid="{$item['bid']}" data-price="{$item['price']}">
 	<td class="trow1">
-		<a href="usercp.php?action=cart&env=bankpipe&remove=1&bid={$item['bid']}" class="bankpipe-item" data-bid="{$item['bid']}">{$this->lang->bankpipe_cart_remove_item}</a>
+		<a href="usercp.php?action=cart&env=bankpipe&remove=1&bid={$item['bid']}" class="bankpipe-item" data-bid="{$item['bid']}" data-action="remove" title="{$this->lang->bankpipe_cart_remove_item}">
+			<img src="images/invalid.png" />
+		</a>
 		<a href="{$item['postlink']}">{$item['name']}</a>
 	</td>
 	<td class="trow1 price" align="center" width="100">
-		{$item['price']}
+		{$item['price']}{$currency}
 	</td>
 	<td class="trow1 discounts" align="center" width="100">
 		{$itemDiscounts}

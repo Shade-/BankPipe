@@ -205,6 +205,8 @@ class Downloadlogs
 
         }
 
+        $format = get_datepicker_format();
+
         echo <<<HTML
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/datepicker/0.6.5/datepicker.min.css" type="text/css" />
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/datepicker/0.6.5/datepicker.min.js"></script>
@@ -213,7 +215,7 @@ class Downloadlogs
 // Date picking
 var expiry = $("#startingdate, #endingdate").datepicker({
     autoHide: true,
-    format: 'dd/mm/yyyy'
+    format: '$format'
 })
 -->
 </script>

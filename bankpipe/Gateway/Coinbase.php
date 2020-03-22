@@ -144,9 +144,7 @@ class Coinbase extends Core
             }
 
             return $this->log->save([
-                'message' => $this->lang->sprintf(
-                    $this->lang->bankpipe_error_webhook_no_matching_items, $event->id
-                )
+                'message' => json_encode($payload)
             ]);
 
         }
@@ -156,8 +154,11 @@ class Coinbase extends Core
 
         $bids = array_column($order['items'], 'bid');
 
+        $donation = ($order['donor']) ? true : false;
+        $buyerUid = ($donation) ? (int) $order['donor'] : (int) $order['uid'];
+
         // Status: confirmed
-        if ($event->type == 'charge:confirmed' and $status = 'COMPLETED') {
+        if (in_array($event->type, ['charge:confirmed', 'charge:resolved']) and in_array($status, ['COMPLETED', 'RESOLVED'])) {
 
             $update = [
                 'type' => Orders::SUCCESS,
@@ -172,7 +173,7 @@ class Coinbase extends Core
             $this->orders->update($update, $order['invoice']);
 
             // Update usergroup
-            $this->updateUsergroup($order['items'], $order['buyer']);
+            $this->updateUsergroup($order['items'], $order['uid']);
 
             // Success notifications
             $order = array_merge($order, $update);
@@ -180,7 +181,7 @@ class Coinbase extends Core
             $names = array_column($order['items'], 'name');
             $currency = Core::friendlyCurrency($order['currency']);
 
-            $buyer = ($order['buyer'] != $this->mybb->user['uid']) ? get_user($order['buyer']) : $this->mybb->user;
+            $buyer = get_user($buyerUid);
 
             // Merchants and admins
             if ($this->mybb->settings['bankpipe_admin_notification']) {
@@ -214,7 +215,10 @@ class Coinbase extends Core
             }
 
             // Buyer
-            $receivers = [$order['buyer']];
+            $receivers = [$buyerUid];
+
+            $user = ($donation) ? get_user($order['uid']) : [];
+            $donationLabel = ($donation) ? $this->lang->sprintf($this->lang->bankpipe_notification_donation_label, $user['username']) : '';
 
             $title = $this->lang->sprintf(
                 $this->lang->bankpipe_notification_buyer_purchase_title,
@@ -230,17 +234,38 @@ class Coinbase extends Core
                 $update['crypto_price'],
                 $update['crypto_currency'],
                 $this->mybb->settings['bburl'] . '/usercp.php?action=purchases&env=bankpipe&invoice=' . $order['invoice'],
-                $this->mybb->settings['bbname']
+                $this->mybb->settings['bbname'],
+                $donationLabel
             );
 
             $this->notifications->set($receivers, $title, $message);
-            $this->notifications->send();
+
+            // Eventual donation, send to gifted user
+            if ($donation) {
+
+                $receivers = [$user['uid']];
+
+                $title = $this->lang->sprintf(
+                    $this->lang->bankpipe_notification_donor_purchase_title,
+                    $buyer['username']
+                );
+                $message = $this->lang->sprintf(
+                    $this->lang->bankpipe_notification_donor_purchase,
+                    $user['username'],
+                    $buyer['username'],
+                    '[*]' . implode("\n[*]", $names),
+                    $this->mybb->settings['bbname']
+                );
+
+                $this->notifications->set($receivers, $title, $message);
+
+            }
 
             $this->log->save([
                 'type' => Orders::SUCCESS,
                 'bids' => $bids,
                 'invoice' => $order['invoice'],
-                'uid' => $order['buyer']
+                'uid' => $order['uid']
             ]);
 
         }
@@ -261,7 +286,7 @@ class Coinbase extends Core
                 ], $order['invoice']);
 
                 // Send notifications
-                $buyer = get_user($order['buyer']);
+                $buyer = get_user($buyerUid);
 
                 // Merchants and admins
                 if ($this->mybb->settings['bankpipe_admin_notification']) {
@@ -291,7 +316,7 @@ class Coinbase extends Core
                 }
 
                 // Buyer
-                $receivers = [$order['buyer']];
+                $receivers = [$buyerUid];
 
                 $title = $this->lang->sprintf(
                     $this->lang->bankpipe_notification_buyer_underpaid_purchase_title,
@@ -306,7 +331,6 @@ class Coinbase extends Core
                 );
 
                 $this->notifications->set($receivers, $title, $message);
-                $this->notifications->send();
 
             }
 
@@ -314,7 +338,7 @@ class Coinbase extends Core
                 'type' => Orders::UNRESOLVED,
                 'bids' => $bids,
                 'invoice' => $order['invoice'],
-                'uid' => $order['buyer'],
+                'uid' => $order['uid'],
                 'message' => $this->lang->sprintf($this->lang->bankpipe_payment_marked_as_unresolved, $lastEvent->context)
             ]);
 
@@ -324,7 +348,7 @@ class Coinbase extends Core
 
             $this->orders->destroy($order['invoice']);
 
-            $buyer = get_user($order['buyer']);
+            $buyer = get_user($buyerUid);
 
             // Send out cancel confirmation to the buyer
             $title = $this->lang->bankpipe_notification_pending_payment_cancelled_webhooks_title;
@@ -335,14 +359,13 @@ class Coinbase extends Core
                 $this->mybb->settings['bbname']
             );
 
-            $this->notifications->set([$order['buyer']], $title, $message);
-            $this->notifications->send();
+            $this->notifications->set([$buyerUid], $title, $message);
 
             $this->log->save([
                 'type' => Orders::CANCEL,
                 'bids' => $bids,
                 'invoice' => $order['invoice'],
-                'uid' => $order['buyer']
+                'uid' => $order['uid']
             ]);
 
         }
@@ -380,10 +403,12 @@ class Coinbase extends Core
             $this->log->save([
                 'message' => json_encode($payload),
                 'invoice' => $order['invoice'],
-                'uid' => $order['buyer']
+                'uid' => $order['uid']
             ]);
 
         }
+
+        $this->notifications->send();
 
     }
 

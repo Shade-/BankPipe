@@ -445,6 +445,39 @@ email=Email",
 
         }
 
+        if (version_compare($this->oldVersion, 'beta 8', "<")) {
+
+            if (!$this->db->field_exists('donor', 'bankpipe_payments')) {
+                $this->db->add_column('bankpipe_payments', 'donor', "int(10) NOT NULL DEFAULT '0' after `merchant`");
+            }
+
+            // Multiple groups
+            if ($this->db->field_exists('gid', 'bankpipe_items')) {
+                $this->db->rename_column('bankpipe_items', 'gid', 'gid', "varchar(200) NOT NULL DEFAULT '0'");
+            }
+
+            if ($this->db->field_exists('newgid', 'bankpipe_payments')) {
+                $this->db->rename_column('bankpipe_payments', 'newgid', 'newgid', "varchar(200) NOT NULL DEFAULT '0'");
+            }
+
+            // Subscriptions permissions
+            if (!$this->db->field_exists('permittedgroups', 'bankpipe_items')) {
+                $this->db->add_column('bankpipe_items', 'permittedgroups', "varchar(200) NOT NULL DEFAULT '0' after `gid`");
+            }
+
+            // Discounts code cap
+            if (!$this->db->field_exists('cap', 'bankpipe_discounts')) {
+                $this->db->add_column('bankpipe_discounts', 'cap', "int(10) DEFAULT '0' after `stackable`");
+            }
+
+            if (!$this->db->field_exists('counter', 'bankpipe_discounts')) {
+                $this->db->add_column('bankpipe_discounts', 'counter', "int(10) DEFAULT '0' after `cap`");
+            }
+
+            $updateTemplates = 1;
+
+        }
+
         if ($newSettings) {
             $this->db->insert_query_multiple('settings', $newSettings);
         }

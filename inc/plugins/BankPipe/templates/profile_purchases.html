@@ -4,12 +4,13 @@
 			<td colspan="3" class="thead"><strong>{$lang->bankpipe_profile_purchased_title}</strong></td>
 		</tr>
 		<tr>
-			<th class="tcat">{$lang->bankpipe_profile_cat_attachment}</th>
+			<th class="tcat">{$lang->bankpipe_profile_cat_item}</th>
 			<th class="tcat" align="center">{$lang->bankpipe_profile_cat_cost}</th>
 			<th class="tcat" align="center">{$lang->bankpipe_profile_cat_purchased}</th>
 		</tr>
 	</thead>
 	<tbody>
+		{$pending}
 		{$purchases}
 		{$expired}
 		{$inactive}

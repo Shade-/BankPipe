@@ -2,6 +2,9 @@
 
 namespace BankPipe\Admin;
 
+use BankPipe\Items\Items;
+use BankPipe\Core;
+
 class Main
 {
     use \BankPipe\Helper\MybbTrait;
@@ -82,16 +85,18 @@ class Main
         $this->page->output_header($this->lang->bankpipe);
         $this->page->output_nav_tabs($this->sub_tabs, 'general');
 
+        $currency = Core::friendlyCurrency($this->mybb->settings['bankpipe_currency']);
+
         // Subscriptions
         $form = new \Form(MAINURL . "&action=subscriptions&delete=true", "post", "manage");
 
         $table = new \Table;
 
         $table->construct_header($this->lang->bankpipe_subscriptions_name);
-        $table->construct_header($this->lang->bankpipe_subscriptions_price);
+        $table->construct_header($this->lang->sprintf($this->lang->bankpipe_subscriptions_price, $currency));
         $table->construct_header($this->lang->bankpipe_delete, ['width' => '1px', 'style' => 'text-align: center']);
 
-        $query = $this->db->simple_select('bankpipe_items', '*', "gid <> 0", ['order_by' => 'price ASC']);
+        $query = $this->db->simple_select('bankpipe_items', '*', "type = " . Items::SUBSCRIPTION, ['order_by' => 'price ASC']);
         while ($subscription = $this->db->fetch_array($query)) {
 
             $table->construct_cell("<a href='" . MAINURL . "&action=subscriptions&bid={$subscription['bid']}'>{$subscription['name']}</a>");
@@ -124,12 +129,12 @@ class Main
 
 		$table = new \Table;
 
-		$table->construct_header('Name');
-		$table->construct_header('Enabled');
-		$table->construct_header('Identifier');
-		$table->construct_header('Secret token');
-		$table->construct_header('Wallet ID');
-		$table->construct_header('Sandbox?');
+		$table->construct_header($this->lang->bankpipe_gateways_header_name);
+		$table->construct_header($this->lang->bankpipe_gateways_header_enabled);
+		$table->construct_header($this->lang->bankpipe_gateways_header_identifier);
+		$table->construct_header($this->lang->bankpipe_gateways_header_secret);
+		$table->construct_header($this->lang->bankpipe_gateways_header_walletid);
+		$table->construct_header($this->lang->bankpipe_gateways_header_sandbox);
 
 		$gatewaysCache = [];
 
@@ -171,7 +176,7 @@ class Main
 
         }
 
-		$table->output('Gateways');
+		$table->output($this->lang->bankpipe_gateways_title);
 
 		$buttons = [
             $form->generate_submit_button($this->lang->bankpipe_save)

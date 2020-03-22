@@ -20,10 +20,6 @@ class PayPal extends Core
 
         $this->gateway = Omnipay::create('PayPal_Rest');
 
-        if (!$this->gateways[$this->gatewayName]['id'] or !$this->gateways[$this->gatewayName]['secret']) {
-            $this->messages->error($this->lang->bankpipe_error_missing_tokens);
-        }
-
         $this->gateway->setClientId($this->gateways[$this->gatewayName]['id']);
         $this->gateway->setSecret($this->gateways[$this->gatewayName]['secret']);
 
@@ -138,7 +134,10 @@ class PayPal extends Core
             $data = json_decode(trim(file_get_contents('php://input')));
 
             $order = reset($this->orders->get([
-                'sale' => $data->resource->id
+                'payment_id' => $data->resource->id,
+                'OR' => [
+                    'sale' => $data->resource->id
+                ]
             ], [
                 'includeItemsInfo' => true
             ]));
@@ -155,6 +154,8 @@ class PayPal extends Core
 
             $bids = array_column($order['items'], 'bid');
             $date = strtotime($data->create_time);
+
+            http_response_code(200);
 
             if ($data->event_type == 'PAYMENT.SALE.COMPLETED') {
 
@@ -174,7 +175,7 @@ class PayPal extends Core
                         'fee' => self::filterPrice($data->resource->transaction_fee->value)
                     ], $order['invoice']);
 
-                    $this->updateUsergroup($order['items'], $order['buyer']);
+                    $this->updateUsergroup($order['items'], $order['uid']);
 
                     $order['fee'] = self::filterPrice($data->resource->transaction_fee->value);
                     $this->createNotifications($order);
@@ -184,7 +185,7 @@ class PayPal extends Core
                         'type' => Orders::SUCCESS,
                         'bids' => $bids,
                         'invoice' => $order['invoice'],
-                        'uid' => $order['buyer'],
+                        'uid' => $order['uid'],
                         'date' => $date
                     ]);
 
@@ -201,17 +202,19 @@ class PayPal extends Core
                     'type' => Orders::CANCEL,
                     'bids' => $bids,
                     'invoice' => $order['invoice'],
-                    'uid' => $order['buyer'],
+                    'uid' => $order['uid'],
                     'date' => $date
                 ]);
 
             }
-            else if ($data->event_type == 'PAYMENT.SALE.CREATED') {
+            else if (in_array($data->event_type, ['PAYMENT.SALE.CREATED', 'PAYMENTS.PAYMENT.CREATED'])) {
 
                 // Just update the log's date
                 $this->db->update_query(
                     'bankpipe_log',
-                    ['date' => $date],
+                    [
+                        'date' => $date
+                    ],
                     'invoice = \'' . $order['invoice'] . '\' AND type = ' . Orders::CREATE
                 );
 
@@ -222,7 +225,7 @@ class PayPal extends Core
                     'message' => json_encode($data),
                     'bids' => $bids,
                     'invoice' => $order['invoice'],
-                    'uid' => $order['buyer'],
+                    'uid' => $order['uid'],
                     'date' => $date
                 ]);
 
@@ -238,7 +241,11 @@ class PayPal extends Core
         $names = array_column($order['items'], 'name');
         $currency = Core::friendlyCurrency($order['currency']);
 
-        $buyer = ($order['buyer'] != $this->mybb->user['uid']) ? get_user($order['buyer']) : $this->mybb->user;
+        // Gifted?
+        $donation = ($order['donor']) ? true : false;
+
+        $buyerUid = ($donation) ? (int) $order['donor'] : (int) $order['uid'];
+        $buyer = ($buyerUid != $this->mybb->user['uid']) ? get_user($buyerUid) : $this->mybb->user;
 
         // Merchants and admins
         if ($this->mybb->settings['bankpipe_admin_notification']) {
@@ -275,7 +282,10 @@ class PayPal extends Core
         }
 
         // Buyer
-        $receivers = [$order['buyer']];
+        $receivers = [$buyerUid];
+
+        $user = ($donation) ? get_user($order['uid']) : [];
+        $donationLabel = ($donation) ? $this->lang->sprintf($this->lang->bankpipe_notification_donation_label, $user['username']) : '';
 
         $title = $this->lang->sprintf(
             $this->lang->bankpipe_notification_buyer_purchase_title,
@@ -290,9 +300,31 @@ class PayPal extends Core
             $currency,
             $order['wallet'],
             $this->mybb->settings['bburl'] . '/usercp.php?action=purchases&env=bankpipe&invoice=' . $order['invoice'],
-            $this->mybb->settings['bbname']
+            $this->mybb->settings['bbname'],
+            $donationLabel
         );
 
         $this->notifications->set($receivers, $title, $message);
+
+        // Eventual donation, send to gifted user
+        if ($donation) {
+
+            $receivers = [$user['uid']];
+
+            $title = $this->lang->sprintf(
+                $this->lang->bankpipe_notification_donor_purchase_title,
+                $buyer['username']
+            );
+            $message = $this->lang->sprintf(
+                $this->lang->bankpipe_notification_donor_purchase,
+                $user['username'],
+                $buyer['username'],
+                '[*]' . implode("\n[*]", $names),
+                $this->mybb->settings['bbname']
+            );
+
+            $this->notifications->set($receivers, $title, $message);
+
+        }
     }
 }

@@ -115,7 +115,7 @@ class Core implements GatewayInterface
             // Previous subscriptions
             $item['discount'] = (int) $item['discount'];
 
-            if ($item['discount'] > 0) {
+            if (!$parameters['gift'] and $item['discount'] > 0) {
 
                 // Search for the highest paid previous subscription of this user
                 $query = $this->db->query('
@@ -159,11 +159,12 @@ class Core implements GatewayInterface
             }
 
             // Code discounts
-            if ($discounts and $item['type'] == Items::SUBSCRIPTION) {
+            if ($discounts) {
 
                 foreach ($discounts as $discount) {
 
-                    if (!$permissions->discountCheck($discount, $item)) {
+                    if (!$permissions->discountCheck($discount, $item)
+                        or ($discount['cap'] and $discount['cap'] <= $discount['counter'])) {
                         continue;
                     }
 
@@ -228,6 +229,14 @@ class Core implements GatewayInterface
         $settings['type'] = $settings['type'] ?? Orders::CREATE;
         $settings['discounts'] = $validatedDiscounts;
 
+        // Gift to user?
+        if ($parameters['gift']) {
+
+            $settings['uid'] = $parameters['gift'];
+            $settings['donor'] = $this->mybb->user['uid'];
+
+        }
+
         // If preparation is successful, insert the preliminary order (will be authorized or destroyed in the complete() method)
         $bids = $this->orders->insert($finalItems, $this->orderId, $settings);
 
@@ -288,7 +297,7 @@ class Core implements GatewayInterface
             ], $this->orderId);
 
             // Update usergroup
-            $this->updateUsergroup($order['items'], $order['buyer']);
+            $this->updateUsergroup($order['items'], $order['uid']);
 
             $this->log->save([
                 'type' => Orders::SUCCESS,
@@ -338,7 +347,7 @@ class Core implements GatewayInterface
 
             if ($item['gid']) {
 
-                if ($item['primarygroup']) {
+                if ($item['primarygroup'] and strpos($item['gid'], ',') === false) {
 
                     // Move the current primary group to the additional groups array
                     $additionalGroups[] = $user['usergroup'];
@@ -349,9 +358,15 @@ class Core implements GatewayInterface
                 }
                 else {
 
-                    // Check if the new gid is already present and eventually add it
-                    if (!in_array($item['gid'], $additionalGroups)) {
-                        $additionalGroups[] = $item['gid'];
+                    $groups = explode(',', $item['gid']);
+
+                    foreach ($groups as $gid) {
+
+                        // Check if the new gid is already present and eventually add it
+                        if (!in_array($gid, $additionalGroups)) {
+                            $additionalGroups[] = $gid;
+                        }
+
                     }
 
                 }

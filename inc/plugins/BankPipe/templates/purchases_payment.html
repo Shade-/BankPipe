@@ -13,7 +13,7 @@
 						<thead>
 							<tr>
 								<td class="thead" colspan="2">
-									<strong>{$this->lang->bankpipe_purchases_payment_transaction} {$order['payment_id']}</strong>
+									<strong>{$title} {$order['payment_id']}</strong>
 								</td>
 							</tr>
 						</thead>
@@ -30,6 +30,7 @@
 											<td class="trow1">{$merchant}</td>
 										</tr>
 										{$appliedDiscounts}
+										{$giftTo}
 									</table>
 								</td>
 								<td class="trow1">

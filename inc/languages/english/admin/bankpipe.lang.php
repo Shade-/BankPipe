@@ -1,7 +1,7 @@
 <?php
 
 // Settings
-$l['bankpipe_pluginlibrary_missing'] = "<a href=\"http://mods.mybb.com/view/pluginlibrary\">PluginLibrary</a> is missing. Please install it before doing anything else with bankpipe.";
+$l['bankpipe_pluginlibrary_missing'] = "<a href=\"https://community.mybb.com/mods.php?action=view&pid=573\">PluginLibrary</a> is missing. Please install it before doing anything else with BankPipe.";
 
 $l['setting_group_bankpipe'] = "BankPipe Settings";
 $l['setting_group_bankpipe_desc'] = "Manage your BankPipe settings, such as the currency, who is allowed to see and manage monetized attachments, notifications, etc..";
@@ -33,11 +33,21 @@ $l['setting_bankpipe_pending_payments_cleanup_desc'] = "Enter the number of days
 // Module
 $l['bankpipe'] = 'BankPipe';
 $l['bankpipe_overview'] = 'Overview';
-$l['bankpipe_overview_desc'] = 'Manage your active subscription.';
+$l['bankpipe_overview_desc'] = 'Manage the items active across the whole board and your default wallets and API keys.';
 $l['bankpipe_overview_available_subscriptions'] = 'Available subscriptions';
 
 $l['bankpipe_logs'] = 'History';
 $l['bankpipe_logs_desc'] = 'See and manage the list of payments correctly executed throughout your forum.';
+
+// Gateways
+$l['bankpipe_gateways_title'] = "Gateways";
+$l['bankpipe_gateways_header_name'] = "Name";
+$l['bankpipe_gateways_header_enabled'] = "Enabled";
+$l['bankpipe_gateways_header_identifier'] = "Identifier";
+$l['bankpipe_gateways_header_secret'] = "Secret token";
+$l['bankpipe_gateways_header_walletid'] = "Wallet ID";
+$l['bankpipe_gateways_header_sandbox'] = "Sandbox";
+
 
 // Subscriptions
 $l['bankpipe_subscriptions'] = 'Subscriptions';
@@ -54,14 +64,16 @@ $l['bankpipe_subscriptions_wallet'] = 'Custom wallets';
 $l['bankpipe_subscriptions_wallet_desc'] = 'Specify a custom wallet to send the money to when users purchase this subscription. If set, this will override the default merchant set in BankPipe\'s gateways settings.';
 $l['bankpipe_subscriptions_htmldescription'] = 'Forum description';
 $l['bankpipe_subscriptions_htmldescription_desc'] = 'The extended description will be displayed in the forum. You can add HTML and an unlimited amount of characters.';
-$l['bankpipe_subscriptions_price'] = $l['bankpipe_subscriptions_price'] = 'Price';
+$l['bankpipe_subscriptions_price'] = 'Price ({1})';
 $l['bankpipe_subscriptions_price_desc'] = 'Enter a price for this subscription. Use dots to separate decimals. Do not use anything to separate thousands.';
-$l['bankpipe_subscriptions_usergroup'] = 'Destination usergroup';
-$l['bankpipe_subscriptions_usergroup_desc'] = 'Select the primary usergroup the user will be assigned to after he successfully purchases this subscription.';
+$l['bankpipe_subscriptions_usergroup'] = 'Destination usergroup(s)';
+$l['bankpipe_subscriptions_usergroup_desc'] = 'Select the usergroup(s) the user will be assigned to after he successfully purchases this subscription. If you select multiple usergroups, the following setting ("Change primary usergroup") will have no effect and the usergroups will be added to the user\'s additional groups regardless of the option\'s value.';
 $l['bankpipe_subscriptions_change_primary'] = 'Change primary usergroup';
-$l['bankpipe_subscriptions_change_primary_desc'] = 'If enabled, the user\'s primary usergroup will be changed upon subscribing; otherwise the destination usergroup will be added to his additional groups. When disabled, it allows your users to pay for multiple subscriptions.';
+$l['bankpipe_subscriptions_change_primary_desc'] = 'If enabled, the user\'s primary usergroup will be changed upon subscribing; otherwise the destination usergroup will be added to his additional groups. When disabled, it allows your users to pay for multiple subscriptions. If multiple usergroups are selected, this will have no effect.';
 $l['bankpipe_subscriptions_discount'] = 'Discount';
 $l['bankpipe_subscriptions_discount_desc'] = 'Enter a percentage value discount for this subscription. It will be applied if an user already bought a lower-priced subscription. The final price will be calculated as: this sub - (discount * highest lower-priced sub). Set to 0 to disable.';
+$l['bankpipe_subscriptions_permitted_usergroups'] = 'Usergroup(s) allowed to purchase';
+$l['bankpipe_subscriptions_permitted_usergroups_desc'] = 'Select the usergroup(s) which users are allowed to purchase this subscription. If not set, all usergroups will be able to buy it.';
 $l['bankpipe_subscriptions_expires'] = 'Expiry days';
 $l['bankpipe_subscriptions_expires_desc'] = 'Enter an expiry amount of days for this subscription. When provided, users will be reverted to the usergroup they were in before they purchased this subscription. Set to 0 to let this subscription last forever.';
 $l['bankpipe_subscriptions_expiry_usergroup'] = 'Expiry usergroup';
@@ -86,7 +98,7 @@ $l['bankpipe_manage_notification_description_desc'] = 'The message of this notif
 $l['bankpipe_manage_notification_method'] = 'Notification method';
 $l['bankpipe_manage_notification_method_desc'] = 'Choose whether to send the notification through PMs or email.';
 $l['bankpipe_manage_notification_daysbefore'] = 'Days before expiry';
-$l['bankpipe_manage_notification_daysbefore_desc'] = 'Enter an amount of days within which the notification will be issued. For example, setting it to 2 will send the notification 2 days before a subscription expires. Set to 0 to send when a notification expires.';
+$l['bankpipe_manage_notification_daysbefore_desc'] = 'Enter an amount of days within which the notification will be issued. For example, setting it to 2 will send the notification 2 days before a subscription expires. Set to 0 to send when a subscription expires.';
 
 // Logs
 $l['bankpipe_logs'] = 'Logs';
@@ -135,7 +147,9 @@ $l['bankpipe_history_no_payments'] = 'There are currently no payments completed 
 $l['bankpipe_history_edit'] = 'Edit';
 $l['bankpipe_history_refund'] = 'Refund';
 $l['bankpipe_history_revoke'] = 'Revoke';
-$l['bankpipe_history_revenue'] = '<b>Revenue</b>: {1}';
+$l['bankpipe_history_revenue'] = '<b>This page revenue</b>: {1}';
+$l['bankpipe_history_total_revenue'] = '<b>Total revenue</b>: {1}';
+$l['bankpipe_history_gifted_to'] = ' gifted to ';
 
 // Manual add
 $l['bankpipe_manual_add'] = 'Subscribe users';
@@ -188,8 +202,9 @@ $l['bankpipe_discounts'] = 'Discount codes';
 $l['bankpipe_discounts_desc'] = 'View and manage your discount codes. They can be set up per subscription or item.';
 $l['bankpipe_discounts_header_code'] = 'Code';
 $l['bankpipe_discounts_header_value'] = 'Value';
-$l['bankpipe_discounts_header_permissions'] = 'Allowed users/subs';
+$l['bankpipe_discounts_header_permissions'] = 'Allowed users/usergroups/items';
 $l['bankpipe_discounts_header_expires'] = 'Expiry date';
+$l['bankpipe_discounts_header_cap_counter'] = 'Usage / cap';
 $l['bankpipe_discounts_expires_never'] = 'Never';
 $l['bankpipe_discounts_no_code'] = 'There are currently no discount codes with the specified parameters selected.';
 $l['bankpipe_discounts_delete'] = 'Delete selected discount code(s)';
@@ -212,6 +227,8 @@ $l['bankpipe_manage_discount_stackable'] = 'Stackable';
 $l['bankpipe_manage_discount_stackable_desc'] = 'If a discount code is marked as stackable, your users can use it alongside other stackable codes to add more discount to their items. Otherwise, this code will be used only alone.';
 $l['bankpipe_manage_discount_expires'] = 'Expiry date';
 $l['bankpipe_manage_discount_expires_desc'] = 'Enter an expiration date for this discount code. If omitted, it will last forever or until it is deleted.';
+$l['bankpipe_manage_discount_cap'] = 'Usage cap';
+$l['bankpipe_manage_discount_cap_desc'] = 'Enter an amount of times this discount code can be used. If omitted or equal to 0, it won\'t have any limit. <b>Current usage</b>: {1} time(s).';
 $l['bankpipe_manage_discount_permissions_usergroups'] = 'Allowed usergroups';
 $l['bankpipe_manage_discount_permissions_usergroups_desc'] = 'Choose the usergroups allowed to use this discount code. Leave blank to allow every group.';
 $l['bankpipe_manage_discount_permissions_items'] = 'Allowed items';

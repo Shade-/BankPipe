@@ -68,7 +68,7 @@ class Logs
                     SELECT l.*, u.username, u.usergroup, u.displaygroup, u.avatar, STRING_AGG(l.type || \'|\' || l.date, \',\' ORDER BY l.date DESC) AS types
                     FROM ' . TABLE_PREFIX . 'bankpipe_log l
                     LEFT JOIN ' . TABLE_PREFIX . 'users u ON (u.uid = l.uid)
-                    GROUP BY l.lid, l.invoice, u.username, u.usergroup, u.displaygroup, u.avatar
+                    GROUP BY l.invoice, l.lid, u.username, u.usergroup, u.displaygroup, u.avatar
                     ORDER BY l.date DESC
                     LIMIT ' . (int) $start . ', ' . (int) $perpage . '
                 ');

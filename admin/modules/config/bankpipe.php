@@ -17,15 +17,15 @@ $sub_tabs['general']  = [
     'link' => MAINURL,
     'description' => $lang->bankpipe_overview_desc
 ];
-$sub_tabs['logs'] = [
-    'title' => $lang->bankpipe_logs,
-    'link' => MAINURL . '&action=logs',
-    'description' => $lang->bankpipe_logs_desc
-];
 $sub_tabs['history'] = [
     'title' => $lang->bankpipe_history,
     'link' => MAINURL . '&action=history',
     'description' => $lang->bankpipe_history_desc
+];
+$sub_tabs['logs'] = [
+    'title' => $lang->bankpipe_logs,
+    'link' => MAINURL . '&action=logs',
+    'description' => $lang->bankpipe_logs_desc
 ];
 $sub_tabs['downloadlogs'] = [
     'title' => $lang->bankpipe_downloadlogs,
@@ -37,15 +37,15 @@ $sub_tabs['notifications'] = [
     'link' => MAINURL . '&action=notifications',
     'description' => $lang->bankpipe_notifications_desc
 ];
-$sub_tabs['subscribeusers'] = [
-    'title' => $lang->bankpipe_manual_add,
-    'link' => MAINURL . '&action=subscribeusers',
-    'description' => $lang->bankpipe_manual_add_desc
-];
 $sub_tabs['discounts'] = [
     'title' => $lang->bankpipe_discounts,
     'link' => MAINURL . '&action=discounts',
     'description' => $lang->bankpipe_discounts_desc
+];
+$sub_tabs['subscribeusers'] = [
+    'title' => $lang->bankpipe_manual_add,
+    'link' => MAINURL . '&action=subscribeusers',
+    'description' => $lang->bankpipe_manual_add_desc
 ];
 
 if ($mybb->input['action'] == 'subscriptions') {
@@ -66,13 +66,6 @@ if ($mybb->input['action'] == 'purchases' and in_array($mybb->input['sub'], ['ed
         'description' => $lang->bankpipe_manage_purchase_desc
     ];
 
-}
-
-function dd($data)
-{
-    echo "<pre>";
-    print_r($data);
-    exit;
 }
 
 $className = ($mybb->input['action'])
@@ -96,12 +89,39 @@ $page->output_footer();
 
 function get_formatted_date($string)
 {
+    // American style: mm/dd/yyyy
+    if (in_array($GLOBALS['mybb']->settings['dateformat'][0], ['m', 'F', 'M', 'n'])) {
+        return (int) strtotime((string) $string);
+    }
+
+    // European style: dd/mm/yyyy – AKA the right way. Checkm8 'muricans!
     return (int) strtotime(str_replace('/', '-', (string) $string));
 }
 
+function get_datepicker_format()
+{
+    $format = str_replace(
+        [' ', '-', '.'],
+        '/',
+        $GLOBALS['mybb']->settings['dateformat']
+    );
+
+    return str_replace(
+        ['d', 'j', 'm', 'F', 'M', 'n', 'y', 'Y'],
+        ['dd', 'dd', 'mm', 'mm', 'mm', 'mm', 'yyyy', 'yyyy'],
+        $format
+    );
+}
+
 function format_date($date)
-{   
-    return ($date) ? date('d/m/Y', $date) : $date;
+{
+    $format = str_replace(
+        [' ', '-', '.'],
+        '/',
+        $GLOBALS['mybb']->settings['dateformat']
+    );
+
+    return ($date) ? date($format, $date) : $date;
 }
 
 function array_column_recursive(array $haystack, $needle)

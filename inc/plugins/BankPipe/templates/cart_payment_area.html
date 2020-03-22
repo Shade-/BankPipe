@@ -1,0 +1,78 @@
+<br>
+<table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder buy-area">
+	<thead>
+		<tr>
+			<td class="thead" colspan="2"><strong>{$this->lang->bankpipe_payment_methods_checkout}</strong></td>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td width="50%" class="trow1">
+				<span><b>{$this->lang->bankpipe_payment_methods_gateway}</b></span><br>
+				<span class="smalltext">{$this->lang->bankpipe_payment_methods_gateway_desc}</span><br><br>
+				<div style="text-align: center">
+					{$buyButtons}
+				</div>
+			</td>
+			<td width="50%" class="trow1">
+				<table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" width="100%">
+					{$discountArea}
+					<tr>
+						<td class="trow1" colspan="3">
+							<span><b>{$this->lang->bankpipe_payment_methods_gift_to_user}</b></span><br>
+							<span class="smalltext">{$this->lang->bankpipe_payment_methods_gift_to_user_desc}</span><br><br>
+							<input type="text" class="textbox includeInRequest" style="width: 100%" name="gift" id="gift" />
+							<script type="text/javascript" src="{$mybb->asset_url}/jscripts/select2/select2.min.js?ver=1821"></script>
+							<link rel="stylesheet" href="{$mybb->asset_url}/jscripts/select2/select2.css?ver=1821">
+							<script type="text/javascript">
+							<!--
+								if(use_xmlhttprequest == "1")
+								{
+									MyBB.select2();
+									$("#gift").select2({
+										placeholder: "{$lang->search_user}",
+										minimumInputLength: 2,
+										maximumSelectionSize: 5,
+										multiple: false,
+										ajax: { // instead of writing the function to execute the request we use Select2's convenient helper
+											url: "xmlhttp.php?action=get_users",
+											dataType: 'json',
+											data: function (term, page) {
+												return {
+													query: term, // search term
+												};
+											},
+											results: function (data, page) { // parse the results into the format expected by Select2.
+												// since we are using custom formatting functions we do not need to alter remote JSON data
+												return {results: data};
+											}
+										},
+										initSelection: function(element, callback) {
+											var query = $(element).val();
+											if (query !== "") {
+												var newqueries = [];
+												exp_queries = query.split(",");
+												$.each(exp_queries, function(index, value ){
+													if(value.replace(/\s/g, '') != "")
+													{
+														var newquery = {
+															id: value.replace(/,\s?/g, ", "),
+															text: value.replace(/,\s?/g, ", ")
+														};
+														newqueries.push(newquery);
+													}
+												});
+												callback(newqueries);
+											}
+										},
+									});
+								}
+							// -->
+							</script>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</tbody>
+</table>

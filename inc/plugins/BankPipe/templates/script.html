@@ -1,4 +1,4 @@
-<script type="text/javascript" src="jscripts/bankpipe.js?v=0.7"></script>
+<script type="text/javascript" src="jscripts/bankpipe.js?v=0.8"></script>
 <script type="text/javascript">
 	$(document).ready(function() {
 		
@@ -15,6 +15,7 @@
 			waitingConfirmation: '{$lang->bankpipe_payment_waiting_confirmation}',
 			responseMalformed: '{$lang->bankpipe_response_malformed}',
 		};
+		BankPipe.links.prefix = '{$mybb->settings['bburl']}/';
 		BankPipe.init();
 		
 	});

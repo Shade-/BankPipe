@@ -22,6 +22,8 @@ class Orders
     const UNRESOLVED = 8;
     const UNDERPAID = 9;
 
+    public $orders = [];
+
     public function __construct()
     {
         $this->traitConstruct();
@@ -61,10 +63,13 @@ class Orders
 
             }
 
+            // Target user
+            $uid = ($settings['uid']) ? (int) $settings['uid'] : (int) $this->mybb->user['uid'];
+
             $validatedOrders[$key] = [
                 'invoice' => $this->db->escape_string($orderId),
                 'price' => Core::filterPrice($price),
-                'uid' => $this->mybb->user['uid'],
+                'uid' => $uid,
                 'bid' => (int) $order['bid'],
                 'oldgid' => (int) $order['oldgid'],
                 'newgid' => (int) $order['newgid'],
@@ -85,16 +90,21 @@ class Orders
 
             // Associate merchant with this payment
             if ($settings['wallet']) {
-                $validatedOrders[$key]['wallet'] = $settings['wallet'];
+                $validatedOrders[$key]['wallet'] = $this->db->escape_string($settings['wallet']);
             }
 
             if ($settings['merchant']) {
-                $validatedOrders[$key]['merchant'] = $settings['merchant'];
+                $validatedOrders[$key]['merchant'] = (int) $settings['merchant'];
             }
 
             // Add discounts
             if ($validatedDiscounts) {
                 $validatedOrders[$key]['discounts'] = implode('|', Core::normalizeArray($validatedDiscounts));
+            }
+
+            // Gift?
+            if ($settings['donor']) {
+                $validatedOrders[$key]['donor'] = (int) $settings['donor'];
             }
 
         }
@@ -114,10 +124,10 @@ class Orders
         $return = $bids = [];
 
         $options['group_by'] = $options['group_by'] ?? 'invoice';
+        $options['group_by'] .= ', pid, price, bid';
 
         switch ($this->db->type) {
             case 'pgsql':
-                $options['group_by'] .= ', pid, price, bid';
                 $query = $this->getQuery($search, '*, STRING_AGG(bid || \'|\' || price || \'|\' || pid, \',\') AS concat', $options);
                 break;
             default:
@@ -128,11 +138,10 @@ class Orders
 
             $item = $this->plugins->run_hooks('bankpipe_orders_get_item', $item);
 
-            $item['buyer'] = $item['uid'];
             $item['discounts'] = explode('|', $item['discounts']);
             $specificFeatures = explode(',', $item['concat']);
 
-            unset($item['uid'], $item['concat'], $item['bid'], $item['pid'], $item['price']);
+            unset($item['concat'], $item['bid'], $item['pid'], $item['price']);
 
             $item['currency_code'] = $item['currency'];
             $item['currency'] = Core::friendlyCurrency($item['currency']);
@@ -180,6 +189,8 @@ class Orders
         $args = [&$this, &$return];
         $this->plugins->run_hooks('bankpipe_orders_get', $args);
 
+        $this->orders = array_merge($this->orders, $return);
+
         return $return;
     }
 
@@ -188,6 +199,37 @@ class Orders
         $where['invoice'] = $orderId;
 
         $update = $this->plugins->run_hooks('bankpipe_orders_update', $update);
+
+        // Get order
+        if (!$this->orders[$orderId]) {
+            $this->get(['invoice' => $orderId]);
+        }
+
+        // Update discounts usage
+        if ($update['active'] and $update['type'] == self::SUCCESS and $this->orders[$orderId] and $this->orders[$orderId]['discounts']) {
+
+            // Delete previous subs special "p" value
+            if (($key = array_search('p', $this->orders[$orderId]['discounts'])) !== false) {
+                unset($this->orders[$orderId]['discounts'][$key]);
+            }
+
+            $discounts = Core::normalizeArray($this->orders[$orderId]['discounts']);
+
+            if ($discounts) {
+
+                $table = TABLE_PREFIX . Items::DISCOUNTS_TABLE;
+                $discounts = implode(',', $discounts);
+
+                $this->db->query(<<<SQL
+                    UPDATE $table
+                    SET counter = counter + 1
+                    WHERE did IN ($discounts)
+SQL
+);
+
+            }
+
+        }
 
         return ($update) ? $this->db->update_query(Items::PAYMENTS_TABLE, $update, $this->buildWhereStatement($where)) : false;
     }
@@ -208,25 +250,50 @@ class Orders
 
     private function buildWhereStatement(array $fields)
     {
-        $search = [];
+        $final = '';
 
-        foreach ($fields as $column => $value) {
+        if ($fields['OR']) {
 
-            if (is_int($column)) {
-                $search[] = $value;
-            }
-            else if (is_string($value)) {
-                $search[] = $column . " = '" . $this->db->escape_string($value) . "'";
-            }
-            else if (is_array($value)) {
-                $search[] = $column . " IN ('" . implode("','", $value) . "')";
-            }
-            else {
-                $search[] = $column . " = '" . $value . "'";
+            $or = $fields['OR'];
+            unset($fields['OR']);
+
+        }
+
+        $and = $this->sanitizeFields($fields);
+        $final = implode(' AND ', $and);
+
+        if ($or) {
+
+            if ($or = $this->sanitizeFields($or)) {
+                $final .= ' OR (' . implode(' AND ', $or) . ')';
             }
 
         }
 
-        return implode(' AND ', $search);
+        return $final;
+    }
+
+    private function sanitizeFields(array $fields)
+    {
+        $array = [];
+
+        foreach ($fields as $column => $value) {
+
+            if (is_int($column)) {
+                $array[] = $value;
+            }
+            else if (is_string($value)) {
+                $array[] = $column . " = '" . $this->db->escape_string($value) . "'";
+            }
+            else if (is_array($value)) {
+                $array[] = $column . " IN ('" . implode("','", $value) . "')";
+            }
+            else {
+                $array[] = $column . " = '" . $value . "'";
+            }
+
+        }
+
+        return $array;
     }
 }

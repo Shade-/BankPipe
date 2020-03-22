@@ -283,6 +283,8 @@ class Subscribeusers
 
         $form->end();
 
+        $format = get_datepicker_format();
+
         // JS routines
         echo '
 <link rel="stylesheet" href="../jscripts/select2/select2.css" type="text/css" />
@@ -296,13 +298,13 @@ var start = $("#startdate").datepicker({
     autoPick: true,
     endDate: new Date(),
     autoHide: true,
-    format: \'dd/mm/yyyy\'
+    format: \'' . $format . '\'
 });
 
 var end = $("#enddate").datepicker({
     autoPick: true,
     autoHide: true,
-    format: \'dd/mm/yyyy\'
+    format: \'' . $format . '\'
 });
 
 start.on("pick.datepicker", (e) => {

@@ -4,6 +4,7 @@ namespace BankPipe\Admin;
 
 use BankPipe\Items\Orders;
 use BankPipe\Core;
+use BankPipe\Logs\Handler as Logs;
 
 class Purchases
 {
@@ -26,7 +27,7 @@ class Purchases
                 'includeItemsInfo' => true
             ]));
 
-            $buyer = get_user($order['buyer']);
+            $buyer = get_user($order['uid']);
             $merchant = ($order['merchant']) ? get_user($order['merchant']) : [];
 
             if (!$order['invoice']) {
@@ -438,6 +439,8 @@ HTML
 
         $form->end();
 
+        $format = get_datepicker_format();
+
         echo '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/datepicker/0.6.5/datepicker.min.css" type="text/css" />
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/datepicker/0.6.5/datepicker.min.js"></script>
 <script type="text/javascript">
@@ -445,7 +448,7 @@ HTML
 // Date picking
 var expiry = $("#expires").datepicker({
     autoHide: true,
-    format: \'dd/mm/yyyy\'
+    format: \'' . $format . '\'
 })
 -->
 </script>';

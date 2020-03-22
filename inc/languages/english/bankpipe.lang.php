@@ -6,7 +6,6 @@ $l['bankpipe_not_allowed_to_buy'] = "You are not allowed to buy this item";
 
 // Nav
 $l['bankpipe_nav'] = "Payments and subscriptions";
-$l['bankpipe_nav_subscriptions'] = "Subscriptions";
 $l['bankpipe_nav_purchases'] = "Purchases";
 $l['bankpipe_nav_manage'] = "My items";
 $l['bankpipe_nav_cart'] = "Cart";
@@ -20,16 +19,17 @@ $l['bankpipe_manage_title'] = "Items management";
 $l['bankpipe_manage_wallet'] = "Wallets";
 $l['bankpipe_manage_wallet_desc'] = "Add your wallet address(es) or ID(s) where you will receive funds when users purchase your items. If one or more fields are empty and you have some items set up, the board's wallets will be used instead.";
 $l['bankpipe_manage_settings_save'] = "Save settings";
-$l['bankpipe_manage_cat_attachment'] = $l['bankpipe_profile_cat_attachment'] = $l['bankpipe_purchases_cat_attachment'] = "Attachment";
+$l['bankpipe_manage_cat_attachment'] = $l['bankpipe_purchases_cat_attachment'] = "Attachment";
 $l['bankpipe_manage_cat_size'] = "Size";
 $l['bankpipe_manage_cat_post'] = "Post";
 $l['bankpipe_manage_cat_cost'] = $l['bankpipe_purchases_cat_cost'] = $l['bankpipe_subscriptions_cat_cost'] = $l['bankpipe_profile_cat_cost'] = $l['bankpipe_purchases_payment_cost'] = "Price";
-$l['bankpipe_manage_no_items'] = "You currently do not have any paid items set. To create a paid item, upload an attachment in a post and add a price if possible. The attachment will be then available as a paid item and will be listed here. <b>In order to set up paid items you must have at least one wallet.</b>";
+$l['bankpipe_manage_no_items'] = "You currently do not have any paid items set. To create a paid item, upload an attachment in a post and add a price if possible. The attachment will be then available as a paid item and will be listed here.";
 
 // Profile
 $l['bankpipe_profile_no_purchases'] = "This user hasn't purchased any item at the moment.";
 $l['bankpipe_profile_purchased_title'] = "Purchased items";
-$l['bankpipe_profile_cat_purchased'] = $l['bankpipe_purchases_cat_purchased'] = "Purchased";
+$l['bankpipe_profile_cat_purchased'] = $l['bankpipe_purchases_cat_purchased'] = "Date of purchase";
+$l['bankpipe_profile_cat_item'] = "Item";
 
 // Purchases
 $l['bankpipe_purchases_title'] = "Purchases";
@@ -44,6 +44,7 @@ $l['bankpipe_purchases_payment_total'] = "Total";
 $l['bankpipe_purchases_payment_date'] = "Date";
 $l['bankpipe_purchases_payment_download'] = "Download";
 $l['bankpipe_purchases_payment_merchant'] = "Merchant";
+$l['bankpipe_purchases_payment_gift_to'] = "Gifted to";
 $l['bankpipe_purchases_payment_codes'] = "Discount codes";
 $l['bankpipe_purchases_payment_savings'] = "Total savings";
 $l['bankpipe_purchases_payment_transaction'] = "Transaction";
@@ -65,17 +66,20 @@ $l['bankpipe_cart_item_added'] = "Item added successfully";
 $l['bankpipe_cart_item_added_desc'] = "The selected item has been added successfully to your cart.";
 $l['bankpipe_cart_merchant_different'] = "This item's merchant is different from the one set for other items in your cart. BankPipe can't handle multiple merchants at once. Please either finalize or empty the current cart to add this item to your cart.";
 $l['bankpipe_cart_item_unknown'] = "This item does not exist.";
+$l['bankpipe_discounts_discount'] = "Gift card or promo code";
+$l['bankpipe_discounts_discount_desc'] = "If you have a promo code of some sort, validate it here before checking out.";
 $l['bankpipe_discounts_promo_code'] = "Enter a promo code here";
 $l['bankpipe_discounts_apply'] = "Apply";
 $l['bankpipe_discounts_remove_code'] = "Remove code";
-$l['bankpipe_payment_methods'] = "Payment methods";
-$l['bankpipe_payment_method_continue'] = "Continue";
-$l['bankpipe_payment_method_PayPal'] = "By clicking on <b>Continue</b> we will open a PayPal window, where you will be asked to finalize the payment. PayPal payments are instant.";
-$l['bankpipe_payment_method_Coinbase'] = "By clicking on <b>Continue</b> we will open a Coinbase window, where you will be asked to finalize the payment to a wallet of your choice. Cryptocurrency payments need a certain number of confirmations before being approved: you will be notified accordingly when your payment is successful. You can close the window as soon as Coinbase detects a payment. <b>Network fees are your responsibility. Do not attempt to pay less than requested, or your order will be rejected</b>.";
+$l['bankpipe_payment_methods_gateway'] = "Gateway";
+$l['bankpipe_payment_methods_gateway_desc'] = "Choose your preferred gateway below. PayPal payments are instant, while cryptocurrency payments through Coinbase require several network confirmations before being approved, so payments will be held pending until the network confirms the transaction. If your payment is marked as pending, you will be notified accordingly when it resolves successfully or not.";
+$l['bankpipe_payment_methods_gift_to_user'] = "Gift";
+$l['bankpipe_payment_methods_gift_to_user_desc'] = "If you want to checkout for someone else, please select the user you want to gift the current items in your cart to. If the items are for you, just leave this field blank.";
+$l['bankpipe_payment_methods_checkout'] = "Checkout";
 
 // Discounts
-$l['bankpipe_discount_applied'] = "The discount you have entered has been validated and applied successfully to your cart or subscriptions.";
-$l['bankpipe_discounts_removed'] = "The selected discount has been removed successfully from your cart or subscriptions.";
+$l['bankpipe_discount_applied'] = "The discount you have entered has been validated and applied successfully to your cart.";
+$l['bankpipe_discounts_removed'] = "The selected discount has been removed successfully from your cart.";
 
 // Subscriptions
 $l['bankpipe_subscriptions_title'] = "Subscriptions";
@@ -83,6 +87,7 @@ $l['bankpipe_subscriptions_cat_subscription'] = "Subscription";
 $l['bankpipe_subscriptions_cat_purchase'] = "Purchase";
 $l['bankpipe_subscriptions_not_available'] = "There are currently no subscriptions available.";
 $l['bankpipe_subscriptions_current_plan'] = "Current active plan";
+$l['bankpipe_subscriptions_upgrade_to_unlock'] = "Upgrade to unlock";
 
 // Notifications
 $l['bankpipe_notification_merchant_purchase_title'] = "{1} has purchased some items for {2}{3}";
@@ -101,10 +106,21 @@ your order {2} has been confirmed. You have bought:
 
 [list]{3}[/list]
 
-You paid [b]{4}{5}[/b] to {6}. You can see a detailed breakdown of your purchase [url={7}]here[/url].
+You paid [b]{4}{5}[/b] to {6}. You can see a detailed breakdown of your purchase [url={7}]here[/url].{9}
 
 Best regards,
 {8}";
+$l['bankpipe_notification_donation_label'] = " Your purchase has been given to {1} instead of yourself. He will be notified as well. Great job!";
+$l['bankpipe_notification_donor_purchase_title'] = "{1} gave you a present";
+$l['bankpipe_notification_donor_purchase'] = "Dear {1},
+{2} gave you a present by buying the following items for you:
+
+[list]{3}[/list]
+
+You now have access to the items above. You may receive expiry reminders if these items have an expiration date.
+
+Best regards,
+{4}";
 $l['bankpipe_notification_merchant_underpaid_purchase_title'] = "{1} has placed an order with insufficient funds";
 $l['bankpipe_notification_merchant_underpaid_purchase'] = "Dear merchant,
 [url={2}]{1}[/url] has placed an order (#{5}) but he has sent insufficient funds ({3} {4}) to the wallet: {6}.
@@ -135,7 +151,7 @@ your order {2} has been confirmed. You have bought:
 
 [list]{3}[/list]
 
-You paid [b]{4}{5}[/b] by spending {6}{7}. You can see a detailed breakdown of your purchase [url={8}]here[/url].
+You paid [b]{4}{5}[/b] by spending {6}{7}. You can see a detailed breakdown of your purchase [url={8}]here[/url].{10}
 
 Best regards,
 {9}";
@@ -153,6 +169,7 @@ $l['bankpipe_error_code_expired'] = "This promo code has expired and is no longe
 $l['bankpipe_error_code_not_allowed'] = "You are not allowed to apply this promo code.";
 $l['bankpipe_error_code_not_allowed_stackable'] = "This promo code cannot be stacked to existing applied promo codes. Please remove the others and retry.";
 $l['bankpipe_error_other_codes_not_allowed_stackable'] = "This promo code cannot be applied because a non-stackable code is already applied. Please remove it and retry.";
+$l['bankpipe_error_cap_limit_reached'] = "This promo code has already been used too many times. Bad luck this time!";
 $l['bankpipe_error_code_already_applied'] = "This promo code has already been applied.";
 $l['bankpipe_error_missing_required_field'] = "Some required fields are missing. Please ensure you have filled all the required fields before trying to purchase an item.";
 $l['bankpipe_error_functionality_not_allowed'] = "You are not allowed to use this functionality. Please contact an administrator to ask for permissions.";

@@ -140,7 +140,7 @@ function task_bankpipe($task)
 
                 if ($oldGroup) {
 
-                    if ($items[$subscription['bid']]['primarygroup']) {
+                    if ($items[$subscription['bid']]['primarygroup'] and strpos($subscription['newgid'], ',') === false) {
 
                         $data = [
                             'usergroup' => $oldGroup
@@ -161,9 +161,15 @@ function task_bankpipe($task)
                             $additionalGroups[] = $oldGroup;
                         }
 
-                        // Remove the new gid
-                        if (($key = array_search($subscription['newgid'], $additionalGroups)) !== false) {
-                            unset($additionalGroups[$key]);
+                        // Remove the new gid(s)
+                        $groups = explode(',', $subscription['newgid']);
+                        
+                        foreach ($groups as $gid) {
+                        
+                            if (($key = array_search($gid, $additionalGroups)) !== false) {
+                                unset($additionalGroups[$key]);
+                            }
+                        
                         }
 
                         $data = [

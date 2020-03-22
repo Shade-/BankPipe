@@ -7,6 +7,8 @@
 		{$subscription['price']}{$currency}
 	</td>
 	<td class="trow1" align="center">
-		<a href="usercp.php?action=cart&env=bankpipe&remove=1&bid={$subscription['bid']}" class="button bankpipe-item" data-action="remove">{$lang->bankpipe_remove_from_cart}</a>
+		<span style="color: red">
+    		<img src="images/invalid.png" /> {$lang->bankpipe_subscriptions_upgrade_to_unlock}
+        </span>
 	</td>
 </tr>

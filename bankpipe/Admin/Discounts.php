@@ -44,7 +44,8 @@ class Discounts
                     'gids' => implode(',', (array) $this->mybb->input['gids']),
                     'bids' => (string) $this->mybb->input['bids'],
                     'uids' => (string) $this->mybb->input['uids'],
-                    'name' => (string) $this->mybb->input['name']
+                    'name' => (string) $this->mybb->input['name'],
+                    'cap' => (int) $this->mybb->input['cap']
                 ];
 
                 if ($this->mybb->input['delete']) {
@@ -239,6 +240,17 @@ class Discounts
                 ])
             );
 
+            // Usage cap
+            $container->output_row(
+                $this->lang->bankpipe_manage_discount_cap,
+                $this->lang->sprintf($this->lang->bankpipe_manage_discount_cap_desc, $discount['counter']),
+                $form->generate_text_box('cap', $this->mybb->input['cap'], [
+                    'id' => 'cap',
+                    'style' => '" autocomplete="off'
+                ]),
+                'cap'
+            );
+
             $container->end();
 
             $buttons = [
@@ -246,6 +258,8 @@ class Discounts
             ];
             $form->output_submit_wrapper($buttons);
             $form->end();
+
+            $format = get_datepicker_format();
 
             echo <<<HTML
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/datepicker/0.6.5/datepicker.min.css" type="text/css" />
@@ -258,7 +272,7 @@ class Discounts
 var expiry = $("#expires").datepicker({
     autoHide: true,
     startDate: new Date(),
-    format: 'dd/mm/yyyy'
+    format: '$format'
 });
 
 // Random code generator
@@ -333,6 +347,7 @@ HTML;
             $table->construct_header($this->lang->bankpipe_discounts_header_value, ['width' => '200px']);
             $table->construct_header($this->lang->bankpipe_discounts_header_permissions);
             $table->construct_header($this->lang->bankpipe_discounts_header_expires, ['width' => '200px']);
+            $table->construct_header($this->lang->bankpipe_discounts_header_cap_counter, ['width' => '150px']);
             $table->construct_header($this->lang->bankpipe_delete, ['width' => '1px', 'style' => 'text-align: center']);
 
             $query = $this->db->simple_select(Items::DISCOUNTS_TABLE, '*');
@@ -387,6 +402,10 @@ HTML;
                     $expiryDate = ($discount['expires']) ? my_date('relative', $discount['expires']) : $this->lang->bankpipe_discounts_expires_never;
                     $table->construct_cell($expiryDate, ['style' => 'text-align: center']);
 
+                    // Counter / usage cap
+                    $cap = ($discount['cap']) ? $discount['cap'] : '&infin;';
+                    $table->construct_cell($discount['counter'] . '/' . $cap, ['style' => 'text-align: center']);
+
                     // Delete
                     $table->construct_cell($form->generate_check_box("delete[]", $discount['did']), ['style' => 'text-align: center']);
                     $table->construct_row();
@@ -395,7 +414,7 @@ HTML;
 
             }
             else {
-                $table->construct_cell($this->lang->bankpipe_discounts_no_code, ['colspan' => 5, 'style' => 'text-align: center']);
+                $table->construct_cell($this->lang->bankpipe_discounts_no_code, ['colspan' => 6, 'style' => 'text-align: center']);
                 $table->construct_row();
             }
 

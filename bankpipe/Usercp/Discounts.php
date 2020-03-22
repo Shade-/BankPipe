@@ -34,26 +34,22 @@ class Discounts extends Usercp
             if ($discount['did'] and in_array($discount['did'], $existingDiscounts)) {
                 $errors[] = $this->lang->bankpipe_error_code_already_applied;
             }
-
-            if (!$discount['did']) {
+            else if (!$discount['did']) {
                 $errors[] = $this->lang->bankpipe_error_code_not_found;
             }
             else if ($discount['expires'] and $discount['expires'] < TIME_NOW) {
                 $errors[] = $this->lang->bankpipe_error_code_expired;
             }
-
             // Check for permissions
-            if (!$errors and !$permissions->discountCheck($discount)) {
+            else if (!$permissions->discountCheck($discount)) {
                 $errors[] = $this->lang->bankpipe_error_code_not_allowed;
             }
-
             // Is THIS CODE stackable?
-            if (!$errors and !$discount['stackable'] and count($existingDiscounts) > 0) {
+            else if (!$discount['stackable'] and count($existingDiscounts) > 0) {
                 $errors[] = $this->lang->bankpipe_error_code_not_allowed_stackable;
             }
-
-            // Is THE CURRENT APPLIED CODE stackable? Account for the first value, as if there are many, they are all stackable by design
-            if (!$errors and count($existingDiscounts) > 0) {
+            // Is THE CURRENT APPLIED CODE(S) stackable? Account for the first value, as if there are many, they are all stackable by design
+            else if (count($existingDiscounts) > 0) {
 
                 $query = $this->db->simple_select('bankpipe_discounts', 'did, stackable', "did = '" . (int) reset($existingDiscounts) . "'");
                 $existingCode = $this->db->fetch_array($query);
@@ -62,6 +58,10 @@ class Discounts extends Usercp
                     $errors[] = $this->lang->bankpipe_error_other_codes_not_allowed_stackable;
                 }
 
+            }
+            // Is this code already been used too many times?
+            else if ($discount['cap'] and $discount['cap'] <= $discount['counter']) {
+                $errors[] = $this->lang->bankpipe_error_cap_limit_reached;
             }
 
             $args = [&$this, &$errors, &$discount];

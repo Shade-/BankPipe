@@ -2,6 +2,55 @@
 	<head>
 		<title>{$this->lang->bankpipe_cart_title}</title>
 		{$headerinclude}
+		<style type="text/css">
+
+			.total {
+				text-align: center
+			}
+
+			.total > * {
+				vertical-align: middle
+			}
+
+			.total > b {
+				font-size: 22px
+			}
+
+			.applyDiscounts {
+				display: flex;
+				text-align: center
+			}
+
+			.applyDiscounts > .textbox {
+				width: 100%
+			}
+
+			.applyDiscounts > input[type="submit"] {
+				margin-left: 10px
+			}
+
+			.purchase {
+				padding: 10px 40px;
+				margin: 0 10px;
+				background: #ffc439;
+				display: inline-block;
+				border-radius: 4px;
+			}
+
+			.purchase.Coinbase {
+				background: #fff
+			}
+
+			.purchase img {
+				width: 80px;
+				height: auto
+			}
+
+			a[data-action="remove"] img {
+				vertical-align: middle
+			}
+
+		</style>
 	</head>
 	<body>
 		{$header}
@@ -15,7 +64,6 @@
 							<tr>
 								<td class="thead" colspan="3"><strong>{$this->lang->bankpipe_cart_title}</strong></td>
 							</tr>
-							{$discountArea}
 							<tr>
 								<td class="tcat">{$this->lang->bankpipe_cart_header_item}</td>
 								<td class="tcat" align="center">{$this->lang->bankpipe_cart_header_cost}</td>
@@ -27,18 +75,7 @@
 							{$total}
 						</tbody>
 					</table>
-					<br>
-					<table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder buy-area" style="max-width: 500px; margin: auto">
-						<thead>
-							<tr>
-								<td class="thead" colspan="2"><strong>{$this->lang->bankpipe_payment_methods}</strong></td>
-							</tr>
-						</thead>
-						<tbody>
-							{$buyButtons}
-						</tbody>
-					</table>
-					</div>
+					{$paymentArea}
 				</td>
 			</tr>
 		</table>

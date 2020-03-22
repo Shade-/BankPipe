@@ -164,7 +164,9 @@ class Cart extends Usercp
 
         $errors = ($errors) ? inline_error($errors) : '';
 
-        $items = $appliedDiscounts = $script = $discountArea = '';
+        $items = $appliedDiscounts = $script = $discountArea = $giftToUser = '';
+
+        $currency = Core::friendlyCurrency($this->mybb->settings['bankpipe_currency']);
 
         // Items
         if ($itemsInCart) {
@@ -278,17 +280,16 @@ class Cart extends Usercp
             $buyButtons = '';
             foreach ($gateways as $gateway) {
 
-                $description = 'bankpipe_payment_method_' . $gateway['name'];
-                $description = $this->lang->$description;
-
                 if ($gateway['enabled']) {
-                    eval("\$buyButtons .= \"".$templates->get("bankpipe_payment_method")."\";");
+                    eval("\$buyButtons .= \"".$templates->get("bankpipe_cart_payment_method")."\";");
                 }
 
             }
 
             eval("\$noItemsTemplate = \"".$templates->get("bankpipe_cart_no_items")."\";");
             $noItemsTemplate = json_encode($noItemsTemplate);
+
+            eval("\$paymentArea = \"".$templates->get("bankpipe_cart_payment_area")."\";");
 
         }
 

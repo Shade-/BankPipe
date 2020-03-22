@@ -7,7 +7,7 @@
  * @package BankPipe
  * @license Copyrighted ©
  * @author  Shade <shad3-@outlook.com>
- * @version beta 7
+ * @version beta 9
  */
 
 if (!defined('IN_MYBB')) {
@@ -59,7 +59,7 @@ function bankpipe_info()
         'description'   =>  'A fully functional payment system for MyBB.' . $description,
         'website'       =>  'https://www.mybboost.com/forum-bankpipe',
         'author'        =>  'Shade',
-        'version'       =>  'beta 7',
+        'version'       =>  'beta 9',
         'compatibility' =>  '18*',
     ];
 }
@@ -99,7 +99,8 @@ function bankpipe_install()
                     bid serial,
                     uid int DEFAULT '0',
                     price decimal(6,2) NOT NULL,
-                    gid int DEFAULT '0',
+                    gid varchar(200) NOT NULL DEFAULT '',
+                    permittedgroups varchar(200) NOT NULL DEFAULT '0',
                     aid int DEFAULT '0',
                     name varchar(128) DEFAULT NULL,
                     description varchar(128) DEFAULT NULL,
@@ -119,7 +120,8 @@ function bankpipe_install()
                     bid int(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
                     uid int(10) DEFAULT '0',
                     price decimal(6,2) NOT NULL,
-                    gid int(10) DEFAULT '0',
+                    gid varchar(200) NOT NULL DEFAULT '',
+                    permittedgroups varchar(200) NOT NULL DEFAULT '0',
                     aid int(10) DEFAULT '0',
                     name varchar(128) DEFAULT NULL,
                     description varchar(128) DEFAULT NULL,
@@ -249,6 +251,7 @@ function bankpipe_install()
                     pid serial,
                     uid int NOT NULL DEFAULT '0',
                     merchant int NOT NULL DEFAULT '0',
+                    donor int NOT NULL DEFAULT '0',
                     wallet text,
                     payment_id varchar(32) NOT NULL DEFAULT '',
                     sale text,
@@ -262,7 +265,7 @@ function bankpipe_install()
                     date int DEFAULT '0',
                     expires int DEFAULT '0',
                     oldgid int DEFAULT '0',
-                    newgid int DEFAULT '0',
+                    newgid varchar(200) NOT NULL DEFAULT '',
                     sentnotification int DEFAULT '0',
                     active smallint NOT NULL DEFAULT '1',
                     fee decimal(6,2),
@@ -281,6 +284,7 @@ function bankpipe_install()
                     pid int(10) NOT NULL AUTO_INCREMENT PRIMARY KEY,
                     uid int(10) NOT NULL DEFAULT '0',
                     merchant int(10) NOT NULL DEFAULT '0',
+                    donor int(10) NOT NULL DEFAULT '0',
                     wallet text,
                     payment_id varchar(32) NOT NULL DEFAULT '',
                     sale text,
@@ -294,7 +298,7 @@ function bankpipe_install()
                     date int(10) DEFAULT '0',
                     expires int(10) DEFAULT '0',
                     oldgid int(5) DEFAULT '0',
-                    newgid int(5) DEFAULT '0',
+                    newgid varchar(200) NOT NULL DEFAULT '',
                     sentnotification int(5) DEFAULT '0',
                     active tinyint(1) NOT NULL DEFAULT '1',
                     fee decimal(6,2),
@@ -330,6 +334,8 @@ function bankpipe_install()
                     date int DEFAULT '0',
                     expires int DEFAULT '0',
                     stackable smallint DEFAULT '0',
+                    cap int DEFAULT '0',
+                    counter int DEFAULT '0',
                     PRIMARY KEY (did)
                 );");
                 break;
@@ -346,7 +352,9 @@ function bankpipe_install()
                     type tinyint(1) NOT NULL DEFAULT '0',
                     date int(10) DEFAULT '0',
                     expires int(10) DEFAULT '0',
-                    stackable tinyint(1) DEFAULT '0'
+                    stackable tinyint(1) DEFAULT '0',
+                    cap int(10) DEFAULT '0',
+                    counter int(10) DEFAULT '0'
                 ) ENGINE=MyISAM{$collation};
                 ");
                 break;
@@ -844,20 +852,12 @@ function bankpipe_global_start()
 
     if (THIS_SCRIPT == 'usercp.php') {
 
-        if ($mybb->input['action'] == 'subscriptions') {
-            $templatelist[] = 'bankpipe_script';
-            $templatelist[] = 'bankpipe_subscriptions_subscription';
-            $templatelist[] = 'bankpipe_subscriptions_subscription_added';
-            $templatelist[] = 'bankpipe_subscriptions_subscription_purchased';
-            $templatelist[] = 'bankpipe_subscriptions_no_subscriptions';
-            $templatelist[] = 'bankpipe_subscriptions';
-        }
-
         if ($mybb->input['action'] == 'purchases') {
             $templatelist[] = 'bankpipe_purchases_payment';
             $templatelist[] = 'bankpipe_purchases_payment_item';
             $templatelist[] = 'bankpipe_purchases_payment_discounts';
             $templatelist[] = 'bankpipe_purchases_payment_pending';
+            $templatelist[] = 'bankpipe_purchases_payment_gift_to';
             $templatelist[] = 'bankpipe_purchases_purchase_refunded';
             $templatelist[] = 'bankpipe_purchases_purchase_expired';
             $templatelist[] = 'bankpipe_purchases_purchase_inactive';
@@ -878,15 +878,23 @@ function bankpipe_global_start()
 
         if ($mybb->input['action'] == 'cart') {
             $templatelist[] = 'bankpipe_script';
-            $templatelist[] = 'bankpipe_payment_method';
             $templatelist[] = 'bankpipe_discounts';
             $templatelist[] = 'bankpipe_discounts_code';
             $templatelist[] = 'bankpipe_cart_item';
             $templatelist[] = 'bankpipe_cart_item_discounts';
             $templatelist[] = 'bankpipe_cart_no_items';
             $templatelist[] = 'bankpipe_cart_total';
+            $templatelist[] = 'bankpipe_cart_payment_area';
+            $templatelist[] = 'bankpipe_cart_payment_method';
             $templatelist[] = 'bankpipe_cart';
         }
+
+        $templatelist[] = 'bankpipe_nav';
+        $templatelist[] = 'bankpipe_nav_manage';
+
+    }
+
+    if (THIS_SCRIPT == 'private.php') {
 
         $templatelist[] = 'bankpipe_nav';
         $templatelist[] = 'bankpipe_nav_manage';
@@ -914,6 +922,16 @@ function bankpipe_global_start()
         $templatelist[] = 'bankpipe_purchases_no_purchases';
         $templatelist[] = 'bankpipe_purchases';
 
+    }
+
+    if (THIS_SCRIPT == 'bankpipe.php' and !$mybb->input['action']) {
+        $templatelist[] = 'bankpipe_script';
+        $templatelist[] = 'bankpipe_subscriptions_subscription';
+        $templatelist[] = 'bankpipe_subscriptions_subscription_added';
+        $templatelist[] = 'bankpipe_subscriptions_subscription_purchased';
+        $templatelist[] = 'bankpipe_subscriptions_subscription_not_allowed';
+        $templatelist[] = 'bankpipe_subscriptions_no_subscriptions';
+        $templatelist[] = 'bankpipe_subscriptions';
     }
 
     $templatelist[] = 'bankpipe_header_cart';
@@ -1260,7 +1278,7 @@ function bankpipe_pre_output_page(&$content)
 
 function bankpipe_profile()
 {
-    global $memprofile, $mybb, $db, $lang, $templates, $theme, $plugins;
+    global $memprofile, $mybb, $db, $lang, $templates, $theme, $plugins, $ordersCounter;
 
     if ($mybb->usergroup['cancp']) {
 
@@ -1269,10 +1287,16 @@ function bankpipe_profile()
         $exclude = [Orders::CREATE, Orders::ERROR, Orders::MANUAL];
         $orders = (new Orders)->get([
             'type NOT IN (' . implode(',', $exclude) . ')',
-            'uid' => $memprofile['uid']
+            'uid' => $memprofile['uid'],
+            'OR' => [
+                'type NOT IN (' . implode(',', $exclude) . ')',
+                'donor' => $memprofile['uid']
+            ]
         ]);
 
         $orders = $plugins->run_hooks('bankpipe_profile', $orders);
+
+        $ordersCounter = count($orders);
 
         if ($orders) {
 
@@ -1308,7 +1332,6 @@ function bankpipe_profile()
         eval("\$memprofile['purchases'] = \"".$templates->get("bankpipe_profile_purchases")."\";");
 
     }
-
 }
 
 function bankpipe_attachment_start()
@@ -1693,7 +1716,7 @@ function bankpipe_merge_accounts()
 {
     global $db, $uid_update, $source_user;
 
-    $db->update_query('bankpipe_logs', $uid_update, "uid='{$source_user['uid']}'");
+    $db->update_query('bankpipe_log', $uid_update, "uid='{$source_user['uid']}'");
     $db->update_query('bankpipe_items', $uid_update, "uid='{$source_user['uid']}'");
     $db->update_query('bankpipe_payments', $uid_update, "uid='{$source_user['uid']}'");
     $db->update_query('bankpipe_downloadlogs', $uid_update, "uid='{$source_user['uid']}'");
