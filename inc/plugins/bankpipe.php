@@ -7,7 +7,7 @@
  * @package BankPipe
  * @license Copyrighted ©
  * @author  Shade <shad3-@outlook.com>
- * @version beta 9
+ * @version beta 10
  */
 
 if (!defined('IN_MYBB')) {
@@ -59,7 +59,7 @@ function bankpipe_info()
         'description'   =>  'A fully functional payment system for MyBB.' . $description,
         'website'       =>  'https://www.mybboost.com/forum-bankpipe',
         'author'        =>  'Shade',
-        'version'       =>  'beta 9',
+        'version'       =>  'beta 10',
         'compatibility' =>  '18*',
     ];
 }
@@ -986,14 +986,14 @@ function bankpipe_panel()
 
 function bankpipe_edit_attachments()
 {
-    global $templates, $db, $mybb, $forumpermissions, $attachedfile, $pid, $tid, $fid, $items, $plugins;
+    global $templates, $db, $mybb, $forumpermissions, $attachedfile, $pid, $tid, $fid, $itemsHandler, $plugins;
 
     if (!$mybb->settings['bankpipe_third_party'] or !(new Permissions)->simpleCheck([], $fid)) {
         return false;
     }
 
     $aids = [];
-    $items = new Items;
+    $itemsHandler = new Items;
 
     $attachedfile = $plugins->run_hooks('bankpipe_update_paid_attachment', $attachedfile);
 
@@ -1004,7 +1004,7 @@ function bankpipe_edit_attachments()
         if ($update > 0 and $update != $attachedfile['aid']) {
 
             // Get this attachment
-            $attach = $items->getAttachment($update);
+            $attach = $itemsHandler->getAttachment($update);
 
             if ($attach) {
 
@@ -1046,7 +1046,7 @@ function bankpipe_edit_attachments()
     }
 
     // Cache this post attachments
-    $items->getAttachments($aids);
+    $itemsHandler->getAttachments($aids);
 
     $plugins->run_hooks('bankpipe_edit_attachments');
 
@@ -1065,7 +1065,7 @@ function bankpipe_edit_attachments()
 
 function bankpipe_attachment_options()
 {
-    global $attachment, $paidOptions, $templates, $attachcolspan, $mybb, $post_errors, $lang, $items, $plugins;
+    global $attachment, $paidOptions, $templates, $attachcolspan, $mybb, $post_errors, $lang, $itemsHandler, $plugins;
 
     if (!$mybb->settings['bankpipe_third_party']) {
         return false;
@@ -1073,7 +1073,7 @@ function bankpipe_attachment_options()
 
     bankpipe_load_lang();
 
-    $attachment['paid'] = $items->getAttachment($attachment['aid']);
+    $attachment['paid'] = $itemsHandler->getAttachment($attachment['aid']);
 
     if (($mybb->input['previewpost'] or $post_errors or $mybb->input['newattachment'] or $mybb->input['updateattachment']) and $mybb->input['paidattachs'][$attachment['aid']]) {
         $attachment['paid'] = $mybb->input['paidattachs'][$attachment['aid']];

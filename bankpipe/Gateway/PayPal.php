@@ -231,6 +231,9 @@ class PayPal extends Core
 
             }
 
+            $args = [&$this, &$order, &$data];
+            $GLOBALS['plugins']->run_hooks('bankpipe_paypal_webhooks_end', $args);
+
         }
 
     }

@@ -82,6 +82,9 @@ class Coinbase extends Core
     {   
         // Log this as pending, given cryptos need several confirmations before being approved.
         // This should be never called, but leaving it here just in case
+        // --- EDIT: ACCORDING TO INTERNAL LOGS, THIS IS SUPPOSEDLY CALLED BY COINBASE AFTER SENDING THE WEBHOOKS NOTIFICATION, WITHIN 4 SECONDS ---
+        // --- THEREFORE, THIS SNIPPET SHOULD BE REMOVED. LEAVING THIS FOR FUTURE REFERENCE DUE TO CORONAVIRUS LOCKDOWN, BUT SHOULD BE REMOVED ---
+/*
         $this->orders->update([
             'type' => Orders::PENDING,
         ], $this->orderId);
@@ -98,9 +101,10 @@ class Coinbase extends Core
             'type' => Orders::PENDING,
             'bids' => $bids
         ]);
+*/
 
         return [
-            'status' => Orders::PENDING,
+            'status' => Orders::SUCCESS,
             'invoice' => $this->orderId
         ];
     }
@@ -409,6 +413,9 @@ class Coinbase extends Core
         }
 
         $this->notifications->send();
+
+        $args = [&$this, &$order, &$event];
+        $GLOBALS['plugins']->run_hooks('bankpipe_coinbase_webhooks_end', $args);
 
     }
 

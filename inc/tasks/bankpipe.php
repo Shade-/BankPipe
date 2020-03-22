@@ -5,7 +5,7 @@
 
 function task_bankpipe($task)
 {
-    global $db, $lang, $mybb, $cache;
+    global $db, $lang, $mybb, $cache, $plugins;
 
     $lang->load('bankpipe');
 
@@ -135,6 +135,9 @@ function task_bankpipe($task)
             // This subscription has expired
             if ($subscription['expires'] < $now) {
 
+                $args = [&$subscription, &$items, &$users];
+                $subscription = $plugins->run_hooks('bankpipe_tasks_item_expired', $args);
+
                 // Revert usergroup
                 $oldGroup = (int) $subscription['oldgid'];
 
@@ -163,13 +166,13 @@ function task_bankpipe($task)
 
                         // Remove the new gid(s)
                         $groups = explode(',', $subscription['newgid']);
-                        
+
                         foreach ($groups as $gid) {
-                        
+
                             if (($key = array_search($gid, $additionalGroups)) !== false) {
                                 unset($additionalGroups[$key]);
                             }
-                        
+
                         }
 
                         $data = [
