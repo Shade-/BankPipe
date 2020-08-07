@@ -492,6 +492,25 @@ email=Email",
                 'gateway' => 'Coinbase'
             ], "gateway = '' OR gateway IS NULL");
 
+            $updateTemplates = 1;
+
+            // New core edit
+            $PL or require_once PLUGINLIBRARY;
+
+            $edits = [
+                [
+                    'search' => '$closed_bypass = array(',
+                    'after' => [
+                        '\'bankpipe.php\' => array(',
+                        '   \'webhooks\',',
+                        '   \'cancel\'',
+                        '),'
+                    ]
+                ]
+            ];
+
+            $PL->edit_core('bankpipe', 'global.php', $edits, true);
+
         }
 
         if ($newSettings) {
