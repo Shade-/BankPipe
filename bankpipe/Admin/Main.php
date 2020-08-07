@@ -96,7 +96,7 @@ class Main
         $table->construct_header($this->lang->sprintf($this->lang->bankpipe_subscriptions_price, $currency));
         $table->construct_header($this->lang->bankpipe_delete, ['width' => '1px', 'style' => 'text-align: center']);
 
-        $query = $this->db->simple_select('bankpipe_items', '*', "type = " . Items::SUBSCRIPTION, ['order_by' => 'price ASC']);
+        $query = $this->db->simple_select(Items::ITEMS_TABLE, '*', "type = " . Items::SUBSCRIPTION, ['order_by' => 'price ASC']);
         while ($subscription = $this->db->fetch_array($query)) {
 
             $table->construct_cell("<a href='" . MAINURL . "&action=subscriptions&bid={$subscription['bid']}'>{$subscription['name']}</a>");

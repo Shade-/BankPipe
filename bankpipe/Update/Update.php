@@ -478,6 +478,22 @@ email=Email",
 
         }
 
+        if (version_compare($this->oldVersion, 'beta 11', "<")) {
+
+            if (!$this->db->field_exists('gateway', 'bankpipe_payments')) {
+                $this->db->add_column('bankpipe_payments', 'gateway', "text after `type`");
+            }
+
+            $this->db->update_query('bankpipe_payments', [
+                'gateway' => 'PayPal'
+            ], "sale <> '' OR date < 1525703005");
+
+            $this->db->update_query('bankpipe_payments', [
+                'gateway' => 'Coinbase'
+            ], "gateway = '' OR gateway IS NULL");
+
+        }
+
         if ($newSettings) {
             $this->db->insert_query_multiple('settings', $newSettings);
         }

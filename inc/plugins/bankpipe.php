@@ -1,13 +1,13 @@
 <?php
 /**
  * BankPipe
- * 
+ *
  * A fully functional payment system for MyBB.
  *
  * @package BankPipe
  * @license Copyrighted ©
  * @author  Shade <shad3-@outlook.com>
- * @version beta 10
+ * @version beta 11
  */
 
 if (!defined('IN_MYBB')) {
@@ -59,7 +59,7 @@ function bankpipe_info()
         'description'   =>  'A fully functional payment system for MyBB.' . $description,
         'website'       =>  'https://www.mybboost.com/forum-bankpipe',
         'author'        =>  'Shade',
-        'version'       =>  'beta 10',
+        'version'       =>  'beta 11',
         'compatibility' =>  '18*',
     ];
 }
@@ -274,6 +274,7 @@ function bankpipe_install()
                     crypto_currency varchar(3) DEFAULT '',
                     discounts text,
                     type smallint NOT NULL,
+                    gateway text,
                     PRIMARY KEY (pid)
                 );");
                 $db->write_query("CREATE INDEX uid ON " . TABLE_PREFIX . "bankpipe_payments (uid);");
@@ -307,6 +308,7 @@ function bankpipe_install()
                     crypto_currency varchar(3) DEFAULT '',
                     discounts text,
                     type tinyint(1) NOT NULL,
+                    gateway text,
                     KEY uid (uid)
                 ) ENGINE=MyISAM{$collation};
                 ");
@@ -695,6 +697,24 @@ function bankpipe_apply_attachment_edits($apply = false)
         $errors[] = $result;
     }
 
+    $edits = [
+        [
+            'search' => '$closed_bypass = array(',
+            'after' => [
+                '\'bankpipe.php\' => array(',
+                '   \'webhooks\',',
+                '   \'cancel\'',
+                '),'
+            ]
+        ]
+    ];
+
+    $result = $PL->edit_core('bankpipe', 'global.php', $edits, $apply);
+
+    if ($result !== true) {
+        $errors[] = $result;
+    }
+
     // Core edit is necessary for MyBB 1.8.19+
     if ($mybb->version_code > 1818) {
 
@@ -741,6 +761,7 @@ function bankpipe_revert_attachment_edits($apply = false)
 
     $PL->edit_core('bankpipe', 'inc/functions_post.php', [], $apply);
     $PL->edit_core('bankpipe', 'inc/functions_upload.php', [], $apply);
+    $PL->edit_core('bankpipe', 'global.php', [], $apply);
     return $PL->edit_core('bankpipe', 'attachment.php', [], $apply);
 }
 

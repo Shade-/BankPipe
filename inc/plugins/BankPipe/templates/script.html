@@ -1,7 +1,7 @@
-<script type="text/javascript" src="jscripts/bankpipe.js?v=0.8"></script>
+<script type="text/javascript" src="jscripts/bankpipe.js?v=0.11"></script>
 <script type="text/javascript">
 	$(document).ready(function() {
-		
+
 		BankPipe.requiredFields = '{$mybb->settings['bankpipe_required_fields']}';
 		BankPipe.currency = '{$mybb->settings['bankpipe_currency']}';
 		BankPipe.templates.noItems = '{$noItemsTemplate}';
@@ -17,7 +17,7 @@
 		};
 		BankPipe.links.prefix = '{$mybb->settings['bburl']}/';
 		BankPipe.init();
-		
+
 	});
 </script>
 <div id="bankpipe-overlay" style="display: none">{$lang->bankpipe_overlay_preparing_payment}</div>

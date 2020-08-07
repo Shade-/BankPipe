@@ -27,7 +27,7 @@ class Handler
     }
 
     private function outputAndDie(array $data, $type = 'normal')
-    {   
+    {
         if ($type == 'popup') {
 
             $html = trim(ob_get_clean());
@@ -40,7 +40,7 @@ class Handler
 window.opener.BankPipe.processPopupMessage($json);
 window.opener.BankPipe.popupClosedAutomatically = true;
 window.close();
-</script>   
+</script>
 HTML;
             exit;
 

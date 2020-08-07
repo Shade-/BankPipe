@@ -1,16 +1,21 @@
 <?php
 
 // Bankpipe Cleanup
-// TO-DO: implement Orders class
+include MYBB_ROOT . 'bankpipe/autoload.php';
+
+use BankPipe\Items\Orders;
+use BankPipe\Items\Items;
 
 function task_bankpipe($task)
 {
-    global $db, $lang, $mybb, $cache, $plugins;
+    global $db, $lang, $mybb, $cache;
 
     $lang->load('bankpipe');
 
-    // Clean up "CREATE"-type orders. TO-DO: use Orders class. CREATE = 1
-    $db->delete_query('bankpipe_payments', 'type = 1');
+    // Clean up "CREATE"-type orders
+    $db->delete_query(Items::PAYMENTS_TABLE, 'type = ' . Orders::CREATE);
+
+    $ordersHandler = new Orders;
 
     $now = TIME_NOW;
     $updateMailqueue = false;
@@ -22,11 +27,11 @@ function task_bankpipe($task)
     $limit = $now - (60*60*24*$deadline);
     $toDelete = $uids = $users = $pendingPaymentsToDelete = [];
 
-    $query = $db->simple_select('bankpipe_payments', '*', 'type = 3 AND date < ' . $limit);
-    while ($payment = $db->fetch_array($query)) {
-        $pendingPaymentsToDelete[] = $payment;
-        $uids[] = $payment['uid'];
-    }
+    $pendingPaymentsToDelete = $ordersHandler->get([
+        'type' => Orders::PENDING,
+        'date < ' . $limit
+    ]);
+    $uids = array_column($pendingPaymentsToDelete, 'uid');
 
     if ($uids) {
 
@@ -39,7 +44,7 @@ function task_bankpipe($task)
 
     foreach ($pendingPaymentsToDelete as $payment) {
 
-        $toDelete[] = $payment['pid'];
+        $toDelete[] = $payment['invoice'];
 
         $user = $users[$payment['uid']];
 
@@ -68,7 +73,7 @@ function task_bankpipe($task)
     }
 
     if ($toDelete) {
-        $db->delete_query('bankpipe_payments', 'pid IN (' . implode(',', array_unique($toDelete)) . ')');
+        $db->delete_query(Items::PAYMENTS_TABLE, "invoice IN ('" . implode("','", array_unique($toDelete)) . "')");
     }
 
     // Get notifications info
@@ -96,32 +101,33 @@ function task_bankpipe($task)
         return $closest;
     }
 
-    $where = ($expiryDates and max($expiryDates)) ? ' AND expires < ' . max($expiryDates) : '';
-
     require_once MYBB_ROOT . "inc/datahandlers/pm.php";
     $pmhandler                 = new PMDataHandler();
     $pmhandler->admin_override = true;
 
-    $subscriptions = $uids = [];
+    $where = [
+        'active' => 1,
+        'expires > 0'
+    ];
+
+    if ($expiryDates and max($expiryDates)) {
+        $where[] = 'expires < ' . max($expiryDates);
+    }
 
     // Process expiring subscriptions
-    $query = $db->simple_select('bankpipe_payments', '*', 'active = 1 AND expires > 0' . $where, ['order_by' => 'expires ASC']);
-    while ($subscription = $db->fetch_array($query)) {
+    $subscriptions = $ordersHandler->get(
+        $where,
+        [
+            'order_by' => 'expires ASC',
+            'includeItemsInfo' => true
+        ]
+    );
 
-        $subscriptions[] = $subscription;
-        $uids[] = $subscription['uid'];
-
-    }
+    $uids = array_column($subscriptions, 'uid');
 
     if ($subscriptions) {
 
-        // Get associated items
-        $items = $emails = $users = [];
-
-        $query = $db->simple_select('bankpipe_items', 'name, primarygroup, price, bid', 'bid IN (' . implode(',', array_column($subscriptions, 'bid')) . ')');
-        while($item = $db->fetch_array($query)) {
-            $items[$item['bid']] = $item;
-        }
+        $emails = $users = [];
 
         // Get users data
         $query = $db->simple_select('users', 'uid, username, usergroup, additionalgroups, email, displaygroup', 'uid IN (' . implode(',', $uids) . ')');
@@ -132,61 +138,18 @@ function task_bankpipe($task)
         // Process
         foreach ($subscriptions as $subscription) {
 
+            $items = $subscription['items'];
+
             // This subscription has expired
             if ($subscription['expires'] < $now) {
 
-                $args = [&$subscription, &$items, &$users];
-                $subscription = $plugins->run_hooks('bankpipe_tasks_item_expired', $args);
+                // Mark payment as expired
+                $ordersHandler->update([
+                    'active' => 0
+                ], $subscription['invoice']);
 
                 // Revert usergroup
-                $oldGroup = (int) $subscription['oldgid'];
-
-                if ($oldGroup) {
-
-                    if ($items[$subscription['bid']]['primarygroup'] and strpos($subscription['newgid'], ',') === false) {
-
-                        $data = [
-                            'usergroup' => $oldGroup
-                        ];
-
-                        // Change display group only if set differently from "use primary"
-                        if ($users[$subscription['uid']]['displaygroup'] != 0) {
-                            $data['displaygroup'] = 0;
-                        }
-
-                    }
-                    else {
-
-                        $additionalGroups = (array) explode(',', $users[$subscription['uid']]['additionalgroups']);
-
-                        // Check if the old gid is already present and eventually add it
-                        if (!in_array($oldGroup, $additionalGroups)) {
-                            $additionalGroups[] = $oldGroup;
-                        }
-
-                        // Remove the new gid(s)
-                        $groups = explode(',', $subscription['newgid']);
-
-                        foreach ($groups as $gid) {
-
-                            if (($key = array_search($gid, $additionalGroups)) !== false) {
-                                unset($additionalGroups[$key]);
-                            }
-
-                        }
-
-                        $data = [
-                            'additionalgroups' => implode(',', $additionalGroups)
-                        ];
-
-                    }
-
-                    $db->update_query('users', $data, "uid = '" . (int) $subscription['uid'] . "'");
-
-                }
-
-                // Mark payment as expired
-                $db->update_query('bankpipe_payments', ['active' => 0], "pid = '" . (int) $subscription['pid'] . "'");
+                $ordersHandler->utilities->demoteUser($subscription['uid'], $subscription['invoice']);
 
             }
 

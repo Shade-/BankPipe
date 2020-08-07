@@ -100,7 +100,7 @@
                     var input = $(this);
                     var val = input.val();
                     var name = input.attr('name');
-                    
+
                     if (name) {
                         data[name] = val;
                     }
@@ -126,13 +126,18 @@
                         var interval = setInterval(function() {
                             try {
 
+                                if (BankPipe.popupClosedAutomatically) {
+                                    BankPipe.popupClosedAutomatically = false;
+                                    return clearInterval(interval);
+                                }
+
                                 // Popup was closed beforehand, manually
                                 if (w.closed && !BankPipe.popupClosedAutomatically) {
 
                                     // Everything but cryptos? Clear
                                     if (data.gateway != 'Coinbase') {
 
-                                        BankPipe.ajax.request('bankpipe.php?action=cancel&orderId=' + orderId);
+                                        BankPipe.ajax.request('bankpipe.php?action=cancel&type=manual&orderId=' + orderId);
 
                                         $.jGrowl(BankPipe.lang.paymentCancelled, {'theme': 'jgrowl_error'});
 
@@ -182,11 +187,11 @@
                     var itemsCount = itemsInCart.length;
 
                     if (response.message) {
-						
+
 						var location = btn.attr('href');
 
                         if (response.action == 'add') {
-							
+
 							// Fast checkout
 							if (btn.hasClass('fastCheckout')) {
 								return window.location.href = BankPipe.links.prefix + BankPipe.links.cart;

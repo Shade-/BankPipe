@@ -31,7 +31,7 @@ class PayPal extends Core
     }
 
     public function purchase(array $parameters = [], array $items = [])
-    {   
+    {
         return parent::purchase($parameters, $items);
     }
 
@@ -153,7 +153,7 @@ class PayPal extends Core
             }
 
             $bids = array_column($order['items'], 'bid');
-            $date = strtotime($data->create_time);
+            $date = ($data->create_time) ? strtotime($data->create_time) : TIME_NOW;
 
             http_response_code(200);
 
@@ -175,7 +175,7 @@ class PayPal extends Core
                         'fee' => self::filterPrice($data->resource->transaction_fee->value)
                     ], $order['invoice']);
 
-                    $this->updateUsergroup($order['items'], $order['uid']);
+                    $this->orders->utilities->upgradeUser($order['uid'], $order['invoice']);
 
                     $order['fee'] = self::filterPrice($data->resource->transaction_fee->value);
                     $this->createNotifications($order);

@@ -181,6 +181,7 @@ $l['bankpipe_error_items_not_found'] = 'The items you are trying to purchase can
 $l['bankpipe_error_email_not_valid'] = 'Merchant\'s email is not valid. This item cannot be purchased at the moment.';
 $l['bankpipe_error_wallet_not_valid'] = 'Merchant\'s wallet is not valid. This item cannot be purchased at the moment.';
 $l['bankpipe_error_cannot_cancel_order'] = 'You do not have enough permissions to do this or this order cannot be cancelled this way.';
+$l['bankpipe_error_item_not_allowed'] = 'You do not have enough permissions to buy {1}.';
 
 $l['bankpipe_success_purchased_item'] = "You have successfully purchased {1}. You will be redirected to the purchase recap in some seconds.";
 $l['bankpipe_success_settings_edited'] = "Settings edited";

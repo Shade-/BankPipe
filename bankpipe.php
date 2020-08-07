@@ -1,6 +1,7 @@
 <?php
 
 define("IN_MYBB", 1);
+define('THIS_SCRIPT', 'bankpipe.php');
 
 require_once './global.php';
 include './bankpipe/autoload.php';
@@ -66,13 +67,15 @@ if ($mybb->input['action'] == 'cancel') {
         'invoice' => $mybb->input['orderId']
     ]);
 
+    // Decide message type
+    $type = ($mybb->input['type'] == 'manual') ? 'normal' : 'popup';
     $messages->display([
         'cancelled' => true
-    ]);
+    ], $type);
 
 }
 
-if ($mybb->input['action'] == 'webhooks') {
+if ($mybb->input['action'] == 'webhooks' and $mybb->request_method == 'post') {
 
     $plugins->run_hooks('bankpipe_webhooks');
 

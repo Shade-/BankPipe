@@ -58,7 +58,7 @@ class Core implements GatewayInterface
             'cancelUrl' => $this->getCancelUrl()
         ]);
 
-        $finalItems = $bids = $discounts = $validatedDiscounts = [];
+        $finalItems = $bids = $discounts = $validatedDiscounts = $errors = [];
         $finalPrice = 0;
 
         // Cache discounts
@@ -78,6 +78,15 @@ class Core implements GatewayInterface
 
         // Loop through all the items
         foreach ($items as $item) {
+
+            // Check permissions first
+            $allowed = array_filter(explode(',', $item['permittedgroups']));
+            $groupsToCheck = (array) explode(',', $this->mybb->user['additionalgroups']);
+            $groupsToCheck[] = $this->mybb->user['usergroup'];
+
+            if (!$this->mybb->user['uid'] or ($allowed and !array_intersect($groupsToCheck, $allowed))) {
+                $errors[] = $this->lang->sprintf($this->lang->bankpipe_error_item_not_allowed, $item['name']);
+            }
 
             $finalPrice = $price = self::filterPrice($item['price']);
 
@@ -212,6 +221,10 @@ class Core implements GatewayInterface
 
         }
 
+        if ($errors) {
+            return $this->messages->error($errors);
+        }
+
         $settings['amount'] = self::filterPrice($settings['amount']);
 
         try {
@@ -226,6 +239,7 @@ class Core implements GatewayInterface
             return $this->messages->error($e->getMessage());
         }
 
+        $settings['gateway'] = $this->gatewayName;
         $settings['type'] = $settings['type'] ?? Orders::CREATE;
         $settings['discounts'] = $validatedDiscounts;
 
@@ -297,7 +311,7 @@ class Core implements GatewayInterface
             ], $this->orderId);
 
             // Update usergroup
-            $this->updateUsergroup($order['items'], $order['uid']);
+            $this->orders->utilities->upgradeUser($order['uid'], $order['invoice']);
 
             $this->log->save([
                 'type' => Orders::SUCCESS,
@@ -329,61 +343,6 @@ class Core implements GatewayInterface
     public function refund(array $parameters = [])
     {
         return $this->gateway->refund($parameters);
-    }
-
-    public function updateUsergroup(array $items = [], int $uid = 0)
-    {
-        if (!$uid) {
-            return false;
-        }
-
-        $user = get_user($uid);
-
-        // Update usergroup
-        $update = [];
-        $additionalGroups = (array) explode(',', $user['additionalgroups']);
-
-        foreach ($items as $item) {
-
-            if ($item['gid']) {
-
-                if ($item['primarygroup'] and strpos($item['gid'], ',') === false) {
-
-                    // Move the current primary group to the additional groups array
-                    $additionalGroups[] = $user['usergroup'];
-
-                    $update['usergroup'] = (int) $item['gid'];
-                    $update['displaygroup'] = 0; // Use primary
-
-                }
-                else {
-
-                    $groups = explode(',', $item['gid']);
-
-                    foreach ($groups as $gid) {
-
-                        // Check if the new gid is already present and eventually add it
-                        if (!in_array($gid, $additionalGroups)) {
-                            $additionalGroups[] = $gid;
-                        }
-
-                    }
-
-                }
-
-                $update['additionalgroups'] = $additionalGroups;
-
-            }
-
-        }
-
-        if ($update['additionalgroups']) {
-            $update['additionalgroups'] = implode(',', self::normalizeArray($additionalGroups));
-        }
-
-        if ($update) {
-            return $this->db->update_query('users', $update, "uid = '" . $uid . "'");
-        }
     }
 
     public function verifyWebhookSignature(array $parameters = [])
@@ -419,6 +378,11 @@ class Core implements GatewayInterface
     static public function filterPrice(string $price)
     {
         return number_format((float) filter_var(str_replace(',', '.', $price), FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION), 2);
+    }
+
+    static public function sanitizePriceForDatabase(string $price)
+    {
+        return number_format((float) filter_var(str_replace(',', '.', $price), FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION), 2, '.', '');
     }
 
     static public function normalizeArray(array $array)

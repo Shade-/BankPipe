@@ -19,7 +19,7 @@ class Coinbase extends Core
     {
         parent::__construct();
 
-        $this->gateway = Omnipay::create('Coinbase');
+        $this->gateway = Omnipay::create($this->gatewayName);
 
         $this->gateway->setApiKey($this->gateways[$this->gatewayName]['wallet']);
 
@@ -79,7 +79,7 @@ class Coinbase extends Core
     }
 
     public function complete(array $parameters = [])
-    {   
+    {
         // Log this as pending, given cryptos need several confirmations before being approved.
         // This should be never called, but leaving it here just in case
         // --- EDIT: ACCORDING TO INTERNAL LOGS, THIS IS SUPPOSEDLY CALLED BY COINBASE AFTER SENDING THE WEBHOOKS NOTIFICATION, WITHIN 4 SECONDS ---
@@ -114,7 +114,7 @@ class Coinbase extends Core
         // Verify signature
         $headerName = 'X-Cc-Webhook-Signature';
         $headers = getallheaders();
-        $signatureHeader = isset($headers[$headerName]) ? $headers[$headerName] : null;
+        $signatureHeader = isset($headers[$headerName]) ? $headers[$headerName] : '';
         $notdecoded = trim(file_get_contents('php://input'));
         $payload = json_decode($notdecoded);
 
@@ -161,23 +161,26 @@ class Coinbase extends Core
         $donation = ($order['donor']) ? true : false;
         $buyerUid = ($donation) ? (int) $order['donor'] : (int) $order['uid'];
 
+        $sharedUpdateData = [
+            'payment_id' => $this->db->escape_string($event->data->code),
+            'price' => $this->db->escape_string($event->data->payments[0]->value->local->amount), // Real amount paid
+            'currency' => $this->db->escape_string($event->data->payments[0]->value->local->currency),
+            'crypto_price' => $this->db->escape_string((float) $event->data->payments[0]->value->crypto->amount),
+            'crypto_currency' => $this->db->escape_string($event->data->payments[0]->value->crypto->currency)
+        ];
+
         // Status: confirmed
         if (in_array($event->type, ['charge:confirmed', 'charge:resolved']) and in_array($status, ['COMPLETED', 'RESOLVED'])) {
 
-            $update = [
+            $update = array_merge($sharedUpdateData, [
                 'type' => Orders::SUCCESS,
-                'active' => 1,
-                'payment_id' => $this->db->escape_string($event->data->code),
-                'price' => $this->db->escape_string($event->data->payments[0]->value->local->amount), // Real amount paid
-                'currency' => $this->db->escape_string($event->data->payments[0]->value->local->currency),
-                'crypto_price' => $this->db->escape_string((float) $event->data->payments[0]->value->crypto->amount),
-                'crypto_currency' => $this->db->escape_string($event->data->payments[0]->value->crypto->currency)
-            ];
+                'active' => 1
+            ]);
 
             $this->orders->update($update, $order['invoice']);
 
             // Update usergroup
-            $this->updateUsergroup($order['items'], $order['uid']);
+            $this->orders->utilities->upgradeUser($order['uid'], $order['invoice']);
 
             // Success notifications
             $order = array_merge($order, $update);
@@ -279,15 +282,10 @@ class Coinbase extends Core
             // Underpaid = revert order and notify. In all other cases (MULTIPLE, OVERPAID), we log it but the order should be left as is
             if ($lastEvent->context == 'UNDERPAID') {
 
-                $this->orders->update([
+                $this->orders->update(array_merge($sharedUpdateData, [
                     'type' => Orders::UNDERPAID,
-                    'active' => 0,
-                    'payment_id' => $this->db->escape_string($event->data->code),
-                    'price' => $this->db->escape_string($event->data->payments[0]->value->local->amount), // Real amount paid
-                    'currency' => $this->db->escape_string($event->data->payments[0]->value->local->currency),
-                    'crypto_price' => $this->db->escape_string((float) $event->data->payments[0]->value->crypto->amount),
-                    'crypto_currency' => $this->db->escape_string($event->data->payments[0]->value->crypto->currency)
-                ], $order['invoice']);
+                    'active' => 0
+                ]), $order['invoice']);
 
                 // Send notifications
                 $buyer = get_user($buyerUid);

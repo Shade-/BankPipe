@@ -37,9 +37,26 @@ class Purchases
 
         }
 
+        // Reactivate
+        if ($this->mybb->input['sub'] == 'reactivate') {
+
+            $ordersHandler->update([
+                'active' => 1
+            ], $invoice);
+
+            // Upgrade user if previously inactive
+            if (!$order['active']) {
+                $ordersHandler->utilities->upgradeUser($buyer['uid'], $invoice);
+            }
+
+            flash_message($this->lang->bankpipe_success_purchase_reactivated, 'success');
+            admin_redirect(MAINURL . '&action=history');
+
+        }
+
         if ($this->mybb->request_method == 'post') {
 
-            // Revoke?
+            // Revoke
             if ($this->mybb->input['sub'] == 'revoke') {
 
                 if (!$this->mybb->input['no']) {
@@ -48,9 +65,9 @@ class Purchases
                         'active' => 0
                     ], $invoice);
 
-                    // Was this order active before revoking it?
+                    // Demote user if previously active
                     if ($order['active']) {
-                        $this->revertUsergroup($order);
+                        $ordersHandler->utilities->demoteUser($buyer['uid'], $invoice);
                     }
 
                     flash_message($this->lang->bankpipe_success_purchase_revoked, 'success');
@@ -73,7 +90,9 @@ class Purchases
 
                 }
                 catch (Throwable $t) {
-                    dd($t);
+                    echo "<pre>";
+                    print_r($t);
+                    exit;
                 }
 
                 $refund = ($this->mybb->input['amount']) ?
@@ -130,12 +149,16 @@ class Purchases
                 'expires' => (int) $this->mybb->input['expires']
             ];
 
-            // Revert usergroup
-            if ($data['active'] === 0 and $order['active']) {
-                $this->revertUsergroup(array_merge($order, $data));
-            }
-
             $ordersHandler->update($data, $invoice);
+
+            // Demote user if previously active
+            if ($data['active'] === 0 and $order['active']) {
+                $ordersHandler->utilities->demoteUser($buyer['uid'], $invoice);
+            }
+            // Upgrade user if previously inactive
+            else if ($data['active'] === 1 and !$order['active']) {
+                $ordersHandler->utilities->upgradeUser($buyer['uid'], $invoice);
+            }
 
             // Redirect
             flash_message($this->lang->bankpipe_success_purchase_edited, 'success');
@@ -211,13 +234,17 @@ HTML
         }
 
         // Buyer
-        $html = build_profile_link(format_name($buyer['username'], $buyer['usergroup'], $buyer['displaygroup']), $buyer['uid']);
+        $text = build_profile_link(format_name($buyer['username'], $buyer['usergroup'], $buyer['displaygroup']), $buyer['uid']);
+        if ($order['email'] or $order['payer_id']) {
+            $text = implode(', ', [$text, $order['email'], $order['payer_id']]);
+        }
+
         $table->construct_cell($this->lang->bankpipe_edit_purchase_bought_by, [
             'style' => 'font-weight: 700'
         ]);
         $table->construct_cell(<<<HTML
 <div class="form_row">
-    {$html}
+    {$text}
 </div>
 HTML
 );
@@ -452,43 +479,5 @@ var expiry = $("#expires").datepicker({
 })
 -->
 </script>';
-    }
-
-    public function revertUsergroup($subscription)
-    {
-        // Revert usergroup
-        $oldGroup = (int) $subscription['oldgid'];
-
-        if ($oldGroup) {
-
-            if ($subscription['primarygroup']) {
-                $data = [
-                    'usergroup' => $oldGroup,
-                    'displaygroup' => $oldGroup
-                ];
-            }
-            else {
-
-                $additionalGroups = (array) explode(',', $subscription['additionalgroups']);
-
-                // Check if the old gid is already present and eventually add it
-                if (!in_array($oldGroup, $additionalGroups)) {
-                    $additionalGroups[] = $oldGroup;
-                }
-
-                // Remove the new gid
-                if (($key = array_search($subscription['newgid'], $additionalGroups)) !== false) {
-                    unset($additionalGroups[$key]);
-                }
-
-                $data = [
-                    'additionalgroups' => implode(',', $additionalGroups)
-                ];
-
-            }
-
-            $this->db->update_query('users', $data, "uid = '" . (int) $subscription['uid'] . "'");
-
-        }
     }
 }

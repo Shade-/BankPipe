@@ -5,6 +5,7 @@ namespace BankPipe\Admin;
 use BankPipe\Items\Items;
 use BankPipe\Items\Orders;
 use BankPipe\Core;
+use BankPipe\Logs\Handler as Logs;
 
 class History
 {
@@ -13,6 +14,41 @@ class History
     public function __construct()
     {
         $this->traitConstruct(['page', 'sub_tabs']);
+
+        $ordersHandler = new Orders;
+        $logs = new Logs;
+
+        if ($this->mybb->input['delete'] and $this->mybb->request_method == 'post') {
+
+            $toDelete = (array) Core::normalizeArray($this->mybb->input['delete']);
+            $orders = $ordersHandler->get([
+                'invoice' => $toDelete
+            ]);
+
+            foreach ($toDelete as $invoice) {
+
+                // Demote user
+                if ($orders[$invoice] and $orders[$invoice]['active']) {
+                    $ordersHandler->utilities->demoteUser($orders[$invoice]['uid'], $invoice);
+                }
+
+                // Logging
+                $logs->save([
+                    'uid' => $this->mybb->user['uid'],
+                    'type' => Orders::DELETE,
+                    'invoice' => $invoice
+                ]);
+
+                // Destroy order
+                $ordersHandler->destroy($invoice);
+
+            }
+
+            // Redirect
+            flash_message($this->lang->bankpipe_success_deleted_selected_payments, 'success');
+            admin_redirect(MAINURL . '&action=history');
+
+        }
 
         $this->page->add_breadcrumb_item($this->lang->bankpipe_history, MAINURL);
         $this->page->output_header($this->lang->bankpipe_history);
@@ -25,6 +61,9 @@ class History
         $container->output_row('', '', $form->generate_text_box('username', $this->mybb->input['username'], [
             'id' => 'username',
             'style' => '" autocomplete="off" placeholder="' . $this->lang->bankpipe_filter_username
+        ]) . ' ' . $form->generate_text_box('payment_id', $this->mybb->input['payment_id'], [
+            'id' => 'payment_id',
+            'style' => '" autocomplete="off" placeholder="' . $this->lang->bankpipe_filter_payment_id
         ]) . ' ' . $form->generate_text_box('startingdate', $this->mybb->input['startingdate'], [
             'id' => 'startingdate',
             'style' => 'width: 150px" autocomplete="off" placeholder="' . $this->lang->bankpipe_filter_startingdate
@@ -54,6 +93,10 @@ class History
 
             }
 
+            if ($this->mybb->input['payment_id']) {
+                $where[] = "(payment_id LIKE '%" . $this->db->escape_string($this->mybb->input['payment_id']) . "%' OR sale LIKE '%" . $this->db->escape_string($this->mybb->input['payment_id']) . "%')";
+            }
+
             if ($this->mybb->input['startingdate']) {
                 $where[] = "date >= " . get_formatted_date($this->mybb->input['startingdate']);
             }
@@ -66,7 +109,7 @@ class History
 
         // Paging
         $perpage = 20;
-        $sortingOptions = ['username', 'startingdate', 'endingdate'];
+        $sortingOptions = ['username', 'payment_id', 'startingdate', 'endingdate'];
         $sortingString = '';
         foreach ($sortingOptions as $opt) {
             if ($this->mybb->input[$opt]) {
@@ -96,17 +139,23 @@ class History
         }
 
         // Main view
+        if ($numResults > 0) {
+            $form = new \Form(MAINURL . '&action=history', 'post', 'history');
+        }
+
         $table = new \Table;
 
         $table->construct_header($this->lang->bankpipe_history_header_user, ['width' => '15%']);
+        $table->construct_header($this->lang->bankpipe_history_header_gateway, ['width' => '10%']);
         $table->construct_header($this->lang->bankpipe_history_header_merchant, ['width' => '15%']);
         $table->construct_header($this->lang->bankpipe_history_header_items);
         $table->construct_header($this->lang->bankpipe_history_header_revenue, ['width' => '10%']);
         $table->construct_header($this->lang->bankpipe_history_header_date, ['width' => '10%']);
         $table->construct_header($this->lang->bankpipe_history_header_expires, ['width' => '10%']);
-        $table->construct_header($this->lang->bankpipe_history_header_options, ['width' => '10%']);
+        $table->construct_header($this->lang->bankpipe_history_header_options, ['width' => '1px']);
+        $table->construct_header($this->lang->bankpipe_delete, ['width' => '1px', 'style' => 'text-align: center']);
 
-        $orders = (new Orders)->get($where, [
+        $orders = $ordersHandler->get($where, [
             'limit_start' => (int) $start,
             'limit' => (int) $perpage,
             'includeItemsInfo' => true
@@ -153,6 +202,9 @@ class History
 
             $table->construct_cell('<img src="' . $avatar['image'] . '" style="height: 20px; width: 20px; vertical-align: middle" /> ' . $username . $donation);
 
+            // Gateway
+            $table->construct_cell($order['gateway']);
+
             // Merchant
             if ($order['merchant']) {
 
@@ -170,7 +222,7 @@ class History
             // Expires
             $class = $extra = '';
 
-            $expires = ($order['expires']) ? 
+            $expires = ($order['expires']) ?
                 my_date('relative', $order['expires']) :
                 $this->lang->bankpipe_history_expires_never;
 
@@ -229,8 +281,17 @@ class History
                 $popup->add_item($this->lang->bankpipe_history_refund, MAINURL . '&action=purchases&sub=refund&invoice=' . $invoice);
             }
 
-            $popup->add_item($this->lang->bankpipe_history_revoke, MAINURL . '&action=purchases&sub=revoke&invoice=' . $invoice);
+            if ($order['active']) {
+                $popup->add_item($this->lang->bankpipe_history_revoke, MAINURL . '&action=purchases&sub=revoke&invoice=' . $invoice);
+            }
+            else {
+                $popup->add_item($this->lang->bankpipe_history_reactivate, MAINURL . '&action=purchases&sub=reactivate&invoice=' . $invoice);
+            }
             $table->construct_cell($popup->fetch());
+
+            // Delete
+            $table->construct_cell($form->generate_check_box("delete[]", $order['invoice']), ['style' => 'text-align: center']);
+
             $table->construct_row(['class' => $class]);
 
         }
@@ -238,7 +299,7 @@ class History
         if (count($orders) == 0) {
             $table->construct_cell(
                 $this->lang->bankpipe_history_no_payments,
-                ['colspan' => 7, 'style' => 'text-align: center']
+                ['colspan' => 9, 'style' => 'text-align: center']
             );
             $table->construct_row();
         }
@@ -255,7 +316,7 @@ class History
                     $this->lang->bankpipe_history_revenue,
                     implode(', ', $html)
                 ),
-                ['colspan' => 7, 'style' => 'text-align: center']
+                ['colspan' => 9, 'style' => 'text-align: center']
             );
             $table->construct_row();
 
@@ -265,7 +326,11 @@ class History
         if ($numResults > $perpage) {
 
             $revenue = [];
-            $query = $this->db->simple_select(Items::PAYMENTS_TABLE, 'SUM(price) AS total, SUM(fee) AS fees, currency', '', ['group_by' => 'currency']);
+            $query = $this->db->simple_select(
+              Items::PAYMENTS_TABLE, 'SUM(price) AS total, SUM(fee) AS fees, currency',
+              implode(' AND ', $where),
+              ['group_by' => 'currency']
+            );
             while ($rev = $this->db->fetch_array($query)) {
                 $revenue[$rev['currency']] = $rev['total'] - $rev['fees'];
             }
@@ -282,7 +347,7 @@ class History
                         $this->lang->bankpipe_history_total_revenue,
                         implode(', ', $html)
                     ),
-                    ['colspan' => 7, 'style' => 'text-align: center']
+                    ['colspan' => 9, 'style' => 'text-align: center']
                 );
                 $table->construct_row();
             }
@@ -290,6 +355,17 @@ class History
         }
 
         $table->output($this->lang->bankpipe_history);
+
+        if ($numResults > 0) {
+
+            $buttons = [
+                $form->generate_submit_button($this->lang->bankpipe_history_delete)
+            ];
+            $form->output_submit_wrapper($buttons);
+
+            $form->end();
+
+        }
 
         // Adjust date format to the board's one
         $format = get_datepicker_format();

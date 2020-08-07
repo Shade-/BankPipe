@@ -146,6 +146,7 @@ class Logs
 
                     case Orders::MANUAL:
                         $action = $this->lang->bankpipe_logs_manual_subscription;
+                        $success = true;
                         break;
 
                     case Orders::CANCEL:
@@ -155,6 +156,10 @@ class Logs
                     case Orders::SUCCESS:
                         $action = $this->lang->bankpipe_logs_success;
                         $success = true;
+                        break;
+
+                    case Orders::DELETE:
+                        $action = $this->lang->bankpipe_logs_deleted;
                         break;
 
                 }

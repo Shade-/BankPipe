@@ -4,6 +4,7 @@ namespace BankPipe\Items;
 
 use BankPipe\Core;
 use BankPipe\Helper\Permissions;
+use BankPipe\Helper\Utilities;
 
 class Orders
 {
@@ -21,14 +22,16 @@ class Orders
     const CANCEL = 7;
     const UNRESOLVED = 8;
     const UNDERPAID = 9;
+    const DELETE = 10;
 
-    public $orders = [];
+    public static $orders = [];
 
     public function __construct()
     {
         $this->traitConstruct();
 
         $this->permissions = new Permissions;
+        $this->utilities = new Utilities;
     }
 
     public function insert(array $orders, string $orderId, array $settings = [])
@@ -51,7 +54,7 @@ class Orders
 
             $price = $order['price'];
 
-            // Subtract discounts 
+            // Subtract discounts
             if ($settings['discounts'][$order['bid']]) {
 
                 foreach ($settings['discounts'][$order['bid']] as $discount) {
@@ -68,7 +71,7 @@ class Orders
 
             $validatedOrders[$key] = [
                 'invoice' => $this->db->escape_string($orderId),
-                'price' => Core::filterPrice($price),
+                'price' => Core::sanitizePriceForDatabase($price),
                 'uid' => $uid,
                 'bid' => (int) $order['bid'],
                 'oldgid' => (int) $order['oldgid'],
@@ -107,6 +110,11 @@ class Orders
                 $validatedOrders[$key]['donor'] = (int) $settings['donor'];
             }
 
+            // Gateway
+            if ($settings['gateway']) {
+                $validatedOrders[$key]['gateway'] = $this->db->escape_string($settings['gateway']);
+            }
+
         }
 
         $args = [&$this, &$validatedOrders];
@@ -120,47 +128,63 @@ class Orders
     }
 
     public function get(array $search, array $options = [])
-    {   
-        $return = $bids = [];
+    {
+        $ordersToReturn = $bids = [];
 
-        $options['group_by'] = $options['group_by'] ?? 'invoice';
-        $options['group_by'] .= ', pid, price, bid';
+        // Found in cache
+        if ($search['invoice'] and is_string($search['invoice']) and  self::$orders[$search['invoice']]) {
 
-        switch ($this->db->type) {
-            case 'pgsql':
-                $query = $this->getQuery($search, '*, STRING_AGG(bid || \'|\' || price || \'|\' || pid, \',\') AS concat', $options);
-                break;
-            default:
-                $query = $this->getQuery($search, '*, GROUP_CONCAT(bid, \'|\', price, \'|\', pid) concat', $options);
-                break;
+            $ordersToReturn = [
+                $search['invoice'] => self::$orders[$search['invoice']]
+            ];
+
+            if (!$options['includeItemsInfo'] or self::$orders[$search['invoice']]['itemsAdded']) {
+                return $ordersToReturn;
+            }
+
+            // Used to grab items
+            $bids = array_column(self::$orders[$search['invoice']]['items'], 'bid');
+
         }
-        while ($item = $this->db->fetch_array($query)) {
+        // Fetch from db
+        else {
 
-            $item = $this->plugins->run_hooks('bankpipe_orders_get_item', $item);
+            $options['group_by'] = $options['group_by'] ?? 'invoice';
+            $options['group_by'] .= ', pid, price, bid';
 
-            $item['discounts'] = explode('|', $item['discounts']);
-            $specificFeatures = explode(',', $item['concat']);
+            $query = $this->getQuery($search, '*', $options);
+            while ($item = $this->db->fetch_array($query)) {
 
-            unset($item['concat'], $item['bid'], $item['pid'], $item['price']);
+                // Common sanitization stuff
+                $item['discounts'] = explode('|', $item['discounts']);
+                $item['currency_code'] = $item['currency'];
+                $item['currency'] = Core::friendlyCurrency($item['currency']);
 
-            $item['currency_code'] = $item['currency'];
-            $item['currency'] = Core::friendlyCurrency($item['currency']);
+                $item = $this->plugins->run_hooks('bankpipe_orders_get_item', $item);
 
-            $return[$item['invoice']] = $item;
+                // Not yet in the array
+                if (!$ordersToReturn[$item['invoice']]) {
+                    $ordersToReturn[$item['invoice']] = $item;
 
-            foreach ($specificFeatures as $info) {
+                    // Unset specific stuff
+                    unset (
+                        $ordersToReturn[$item['invoice']]['pid'],
+                        $ordersToReturn[$item['invoice']]['price'],
+                        $ordersToReturn[$item['invoice']]['bid']
+                    );
+                }
 
-                $info = explode('|', $info);
-
-                $return[$item['invoice']]['total'] += $info[1];
-
-                $bids[] = $info[0];
-
-                $return[$item['invoice']]['items'][] = [
-                    'bid' => $info[0],
-                    'price' => $info[1],
-                    'pid' => $info[2]
+                // Add the specific item info to a separate subgroup
+                $ordersToReturn[$item['invoice']]['items'][] = [
+                    'bid' => $item['bid'],
+                    'price' => $item['price'],
+                    'pid' => $item['pid'],
+                    'fee' => $item['fee']
                 ];
+                $ordersToReturn[$item['invoice']]['total'] += $item['price'];
+
+                // Cache bids for items
+                $bids[] = $item['bid'];
 
             }
 
@@ -170,15 +194,22 @@ class Orders
 
             // Associate items
             $items = (new Items)->getItems(Core::normalizeArray($bids));
-            foreach ($return as $k => $order) {
 
-                foreach ($order['items'] as $key => $item) {
+            if ($items) {
 
-                    $return[$k]['items'][$key]['originalPrice'] = $items[$item['bid']]['price'];
+                foreach ($ordersToReturn as $k => $order) {
 
-                    if (is_array($items[$item['bid']])) {
-                        $return[$k]['items'][$key] += $items[$item['bid']];
+                    foreach ($order['items'] as $key => $item) {
+
+                        $ordersToReturn[$k]['items'][$key]['originalPrice'] = $items[$item['bid']]['price'];
+
+                        if (is_array($items[$item['bid']])) {
+                            $ordersToReturn[$k]['items'][$key] += $items[$item['bid']];
+                        }
+
                     }
+
+                    $ordersToReturn[$k]['itemsAdded'] = true;
 
                 }
 
@@ -186,12 +217,12 @@ class Orders
 
         }
 
-        $args = [&$this, &$return];
+        $args = [&$this, &$ordersToReturn];
         $this->plugins->run_hooks('bankpipe_orders_get', $args);
 
-        $this->orders = array_merge($this->orders, $return);
+        self::$orders = array_merge(self::$orders, $ordersToReturn);
 
-        return $return;
+        return $ordersToReturn;
     }
 
     public function update(array $update, string $orderId, array $where = [])
@@ -201,19 +232,19 @@ class Orders
         $update = $this->plugins->run_hooks('bankpipe_orders_update', $update);
 
         // Get order
-        if (!$this->orders[$orderId]) {
+        if (!self::$orders[$orderId]) {
             $this->get(['invoice' => $orderId]);
         }
 
         // Update discounts usage
-        if ($update['active'] and $update['type'] == self::SUCCESS and $this->orders[$orderId] and $this->orders[$orderId]['discounts']) {
+        if ($update['active'] and $update['type'] == self::SUCCESS and self::$orders[$orderId] and self::$orders[$orderId]['discounts']) {
 
             // Delete previous subs special "p" value
-            if (($key = array_search('p', $this->orders[$orderId]['discounts'])) !== false) {
-                unset($this->orders[$orderId]['discounts'][$key]);
+            if (($key = array_search('p', self::$orders[$orderId]['discounts'])) !== false) {
+                unset(self::$orders[$orderId]['discounts'][$key]);
             }
 
-            $discounts = Core::normalizeArray($this->orders[$orderId]['discounts']);
+            $discounts = Core::normalizeArray(self::$orders[$orderId]['discounts']);
 
             if ($discounts) {
 
@@ -230,6 +261,9 @@ SQL
             }
 
         }
+
+        // Update the internal cache
+        self::$orders[$orderId] = array_merge(self::$orders[$orderId], $update);
 
         return ($update) ? $this->db->update_query(Items::PAYMENTS_TABLE, $update, $this->buildWhereStatement($where)) : false;
     }

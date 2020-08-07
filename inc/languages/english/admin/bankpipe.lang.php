@@ -115,6 +115,7 @@ $l['bankpipe_logs_success'] = 'Payment successful';
 $l['bankpipe_logs_cancel'] = 'Payment cancelled';
 $l['bankpipe_logs_manual_subscription'] = 'Manual subscription';
 $l['bankpipe_logs_pending'] = 'Pending payment';
+$l['bankpipe_logs_deleted'] = 'Payment deleted (admin action)';
 $l['bankpipe_logs_items_deleted'] = 'The items associated to this log have been deleted';
 $l['bankpipe_logs_delete'] = 'Delete selected log(s)';
 
@@ -134,6 +135,7 @@ $l['bankpipe_downloadlogs_single_item_purchase'] = 'Access granted through a <a 
 $l['bankpipe_history'] = 'Payment history';
 $l['bankpipe_history_desc'] = 'View a complete transactions log history and manage them singularly, including editing, revoking and refunding.';
 $l['bankpipe_history_header_items'] = 'Items purchased';
+$l['bankpipe_history_header_gateway'] = 'Gateway';
 $l['bankpipe_history_header_merchant'] = 'Merchant';
 $l['bankpipe_history_header_revenue'] = 'Net revenue (fee)';
 $l['bankpipe_history_header_expires'] = 'Expires';
@@ -147,9 +149,11 @@ $l['bankpipe_history_no_payments'] = 'There are currently no payments completed 
 $l['bankpipe_history_edit'] = 'Edit';
 $l['bankpipe_history_refund'] = 'Refund';
 $l['bankpipe_history_revoke'] = 'Revoke';
+$l['bankpipe_history_reactivate'] = 'Reactivate';
 $l['bankpipe_history_revenue'] = '<b>This page revenue</b>: {1}';
 $l['bankpipe_history_total_revenue'] = '<b>Total revenue</b>: {1}';
 $l['bankpipe_history_gifted_to'] = ' gifted to ';
+$l['bankpipe_history_delete'] = 'Delete selected payment(s)';
 
 // Manual add
 $l['bankpipe_manual_add'] = 'Subscribe users';
@@ -166,6 +170,13 @@ $l['bankpipe_manual_add_end_date'] = 'Expiry date';
 $l['bankpipe_manual_add_end_date_desc'] = 'Select an expiry date for this subscription. Future dates are accepted. If left blank, the subscription\'s default expiry amount of days will be applied calculated starting from the start date.';
 $l['bankpipe_manual_add_sale_id'] = 'Sale ID';
 $l['bankpipe_manual_add_sale_id_desc'] = '(Optional) Add a valid sale ID. When provided, this subscription will be refundable in the appropriate section for most of the available gateways. This will not work when multiple users are selected.';
+$l['bankpipe_manual_add_revenue'] = 'Revenue and fee';
+$l['bankpipe_manual_add_revenue_desc'] = '(Optional) Specify the revenue and fee associated with this payment.';
+$l['bankpipe_manual_add_gateway'] = 'Gateway';
+$l['bankpipe_manual_add_gateway_desc'] = '(Optional) Select the gateway used to pay for this item.';
+$l['bankpipe_manual_add_revenue_revenue'] = 'Revenue ({1})';
+$l['bankpipe_manual_add_revenue_fee'] = 'Fee ({1})';
+$l['bankpipe_manual_add_profile'] = 'Target user: {1}';
 
 // Manage purchase
 $l['bankpipe_manage_purchase'] = 'Manage purchase';
@@ -249,9 +260,11 @@ $l['bankpipe_success_discount_edited'] = 'Discount edited successfully.';
 $l['bankpipe_success_discount_deleted'] = 'Discount deleted successfully.';
 $l['bankpipe_success_users_added'] = 'The user(s) you have specified have been subscribed successfully to the selected subscription plan.';
 $l['bankpipe_success_deleted_selected_logs'] = 'The log(s) you have selected have been deleted successfully.';
+$l['bankpipe_success_deleted_selected_payments'] = 'The payment(s) you have selected have been deleted successfully.';
 $l['bankpipe_success_purchase_edited'] = 'The purchase has been edited successfully.';
 $l['bankpipe_success_purchase_refunded'] = 'The purchase has been refunded successfully. {1} have been sent to the user. This transaction costed {2} to the merchant in refund fees.';
-$l['bankpipe_success_purchase_revoked'] = 'The purchase has been revoked successfully and the user has been reverted to the usergroup he was in before.';
+$l['bankpipe_success_purchase_revoked'] = 'The purchase has been revoked successfully and the user has been demoted to the usergroup he was in before.';
+$l['bankpipe_success_purchase_reactivated'] = 'The purchase has been reactivated successfully and the user has been upgraded.';
 $l['bankpipe_success_updated'] = "BankPipe has been updated correctly from version {1} to {2}. Good job!";
 
 $l['bankpipe_error_price_not_valid'] = 'The price you entered does not look to be a valid price. Please enter a positive number, either integer or with decimals separated by a dot.';
@@ -283,6 +296,7 @@ $l['bankpipe_delete'] = 'Delete';
 $l['bankpipe_save'] = 'Save';
 $l['bankpipe_filter'] = 'Filter';
 $l['bankpipe_filter_username'] = 'Username';
+$l['bankpipe_filter_payment_id'] = 'Payment or sale ID';
 $l['bankpipe_filter_item'] = 'Item';
 $l['bankpipe_filter_startingdate'] = 'Start date';
 $l['bankpipe_filter_endingdate'] = 'End date';

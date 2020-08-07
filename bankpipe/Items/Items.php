@@ -142,7 +142,7 @@ class Items
     }
 
     public function getItem(int $bid, int $uid = 0)
-    {   
+    {
         return reset($this->getItems([$bid], $uid));
     }
 
@@ -186,7 +186,7 @@ class Items
                 }
 
                 if ($key == 'price') {
-                    $item[$key] = Core::filterPrice($value);
+                    $item[$key] = Core::sanitizePriceForDatabase($value);
                 }
                 else if (is_string($value)) {
                     $item[$key] = $this->db->escape_string($value);

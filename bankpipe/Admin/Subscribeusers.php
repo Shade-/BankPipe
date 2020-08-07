@@ -18,7 +18,7 @@ class Subscribeusers
         $subscriptions = $users = $uids = [];
 
         $query = $this->db->simple_select(
-            'bankpipe_items',
+            Items::ITEMS_TABLE,
             'bid, name, gid, primarygroup, expirygid',
             'type = ' . Items::SUBSCRIPTION,
             ['order_by' => 'price ASC']
@@ -75,7 +75,7 @@ class Subscribeusers
 
             // Normalize uids array
             if ($uids) {
-                $uids = array_filter($uids);
+                $uids = Core::normalizeArray($uids);
             }
 
             if (empty($uids)) {
@@ -95,57 +95,35 @@ class Subscribeusers
             $bid = (int) $this->mybb->input['subscription'];
 
             // Check if not existing already
-            $activeSubs = $data = [];
+            $data = [];
 
-            // TO-DO: this part is built with shit logic. The following should be adapted using the new Orders and Items classes
-            $query = $this->db->simple_select(
-                Items::PAYMENTS_TABLE,
-                'uid',
-                'uid IN (' . implode(',', $uids) . ') AND active = 1'
-            );
-            while ($activeSub = $this->db->fetch_field($query, 'uid')) {
-                $activeSubs[] = $activeSub;
-            }
+            $orders = new Orders;
 
-            $log = new Logs;
+            $activeSubs = $orders->get([
+                'uid' => $uids,
+                'bid' => $bid,
+                'active' => 1
+            ]);
+            $uidsActive = array_column($activeSubs, 'uid');
+
+            $logs = new Logs;
 
             foreach ($uids as $uid) {
 
-                if (!$uid or in_array($uid, $activeSubs)) {
+                if (!$uid or in_array($uid, $uidsActive)) {
                     continue;
                 }
-
-                // Change usergroup
-                if ($subscriptions[$bid]['primarygroup']) {
-                    $update = [
-                        'usergroup' => (int) $subscriptions[$bid]['gid'],
-                        'displaygroup' => (int) $subscriptions[$bid]['gid']
-                    ];
-                }
-                else {
-
-                    $additionalGroups = (array) explode(',', $users[$uid]['additionalgroups']);
-
-                    // Check if the new gid is already present and eventually add it
-                    if (!in_array($subscriptions[$bid]['gid'], $additionalGroups)) {
-                        $additionalGroups[] = $subscriptions[$bid]['gid'];
-                    }
-
-                    $update = [
-                        'additionalgroups' => implode(',', Core::normalizeArray($additionalGroups))
-                    ];
-
-                }
-
-                $this->db->update_query('users', $update, "uid = '" . (int) $uid . "'");
 
                 $arr = [
                     'bid' => $bid,
                     'uid' => (int) $uid,
+                    'price' => $this->db->escape_string(Core::sanitizePriceForDatabase($this->mybb->input['revenue'])),
+                    'fee' => $this->db->escape_string(Core::sanitizePriceForDatabase($this->mybb->input['fee'])),
                     'currency' => $this->db->escape_string($this->mybb->settings['bankpipe_currency']),
                     'sale' => $this->db->escape_string($this->mybb->input['sale']),
                     'date' => $startDate,
                     'expires' => $endDate,
+                    'gateway' => $this->db->escape_string($this->mybb->input['gateway']),
                     'newgid' => (int) $subscriptions[$bid]['gid'],
                     'invoice' => uniqid(),
                     'type' => Orders::MANUAL
@@ -161,34 +139,40 @@ class Subscribeusers
 
             $data = array_filter($data);
 
-            if ($data) {
+            // Log
+            $uids = array_column($data, 'uid');
 
-                $this->db->insert_query_multiple(Items::PAYMENTS_TABLE, $data);
+            $profiles = [];
 
-                // Log this
-                $bids = array_column($data, 'bid');
-                if ($bids) {
+            if ($uids) {
 
-                    $uids = array_column($data, 'uid');
+                $query = $this->db->simple_select('users', 'uid, username', 'uid IN (' . implode(',', $uids) . ')');
+                while ($user = $this->db->fetch_array($query)) {
+                    $profiles[$user['uid']] = build_profile_link($user['username'], $user['uid']);
+                }
 
-                    $message = [];
+                foreach ($data as $insert) {
 
-                    if ($uids) {
-
-                        $query = $this->db->simple_select('users', 'uid, username', 'uid IN (' . implode(',', $uids) . ')');
-                        while ($user = $this->db->fetch_array($query)) {
-                            $message[] = build_profile_link($user['username'], $user['uid']);
-                        }
-
-                    }
-
-                    $log->save([
-                        'message' => implode(', ', $message),
+                    $logs->save([
+                        'message' => $this->lang->sprintf($this->lang->bankpipe_manual_add_profile, $profiles[$insert['uid']]),
                         'uid' => $this->mybb->user['uid'],
                         'type' => Orders::MANUAL,
-                        'bids' => $bids
+                        'bids' => $insert['bid'],
+                        'invoice' => $insert['invoice']
                     ]);
 
+                }
+
+            }
+
+            if ($data) {
+
+                // Insert payments
+                $this->db->insert_query_multiple(Items::PAYMENTS_TABLE, $data);
+
+                // Upgrade users
+                foreach ($data as $insert) {
+                    $orders->utilities->upgradeUser($insert['uid'], $insert['invoice']);
                 }
 
             }
@@ -225,8 +209,8 @@ class Subscribeusers
 
         $usergroups = [];
 
-        $groups_cache = $this->cache->read('usergroups');
-        foreach ($groups_cache as $group) {
+        $groupsCache = $this->cache->read('usergroups');
+        foreach ($groupsCache as $group) {
             $usergroups[$group['gid']] = $group['title'];
         }
 
@@ -247,13 +231,43 @@ class Subscribeusers
             ])
         );
 
+        $currency = Core::friendlyCurrency($this->mybb->settings['bankpipe_currency']);
+
+        $container->output_row(
+            $this->lang->bankpipe_manual_add_revenue,
+            $this->lang->bankpipe_manual_add_revenue_desc,
+            $form->generate_text_box('revenue', $this->mybb->input['revenue'], [
+                'id' => 'revenue',
+                'style' => '" placeholder="' . $this->lang->sprintf($this->lang->bankpipe_manual_add_revenue_revenue, $currency)
+            ]) . ' ' .
+            $form->generate_text_box('fee', $this->mybb->input['fee'], [
+                'id' => 'fee',
+                'style' => '" placeholder="' . $this->lang->sprintf($this->lang->bankpipe_manual_add_revenue_fee, $currency)
+            ])
+        );
+
+        $gateways = [
+            '' => $this->lang->bankpipe_manual_add_gateway_none
+        ];
+        $query = $this->db->simple_select('bankpipe_gateways', 'name');
+        while ($name = $this->db->fetch_field($query, 'name')) {
+            $gateways[$name] = $name;
+        }
+
+        $container->output_row(
+            $this->lang->bankpipe_manual_add_gateway,
+            $this->lang->bankpipe_manual_add_gateway_desc,
+            $form->generate_select_box('gateway', $gateways, $this->mybb->input['gateway'], [
+                'id' => 'gateway'
+            ])
+        );
+
         $container->output_row(
             $this->lang->bankpipe_manual_add_start_date,
             $this->lang->bankpipe_manual_add_start_date_desc,
             $form->generate_text_box('startdate', $this->mybb->input['startdate'], [
                 'id' => 'startdate'
-            ]),
-            'startdate'
+            ])
         );
 
         $container->output_row(
@@ -261,8 +275,7 @@ class Subscribeusers
             $this->lang->bankpipe_manual_add_end_date_desc,
             $form->generate_text_box('enddate', $this->mybb->input['enddate'], [
                 'id' => 'enddate'
-            ]),
-            'enddate'
+            ])
         );
 
         $container->output_row(
@@ -270,8 +283,7 @@ class Subscribeusers
             $this->lang->bankpipe_manual_add_sale_id_desc,
             $form->generate_text_box('sale', $this->mybb->input['sale'], [
                 'id' => 'sale'
-            ]),
-            'sale'
+            ])
         );
 
         $container->end();
