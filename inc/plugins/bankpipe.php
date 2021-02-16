@@ -5,8 +5,8 @@
  * A fully functional payment system for MyBB.
  *
  * @package BankPipe
- * @license Copyrighted ©
  * @author  Shade <shad3-@outlook.com>
+ * @license MIT https://opensource.org/licenses/MIT
  * @version beta 11
  */
 
@@ -836,7 +836,7 @@ function bankpipe_ad()
     $plugins = $cache->read('shade_plugins');
     if (!in_array($mybb->user['uid'], (array) $plugins['BankPipe']['ad_shown'])) {
 
-        flash_message('Thank you for purchasing BankPipe! You might also be interested in other great plugins on <a href="https://www.mybboost.com">MyBBoost</a>, where you can also get support for BankPipe itself.<br /><small>This message will not be shown again to you.</small>', 'success');
+        flash_message('Thank you for downloading BankPipe! You might also be interested in other great plugins at <a href="https://www.mybboost.com">MyBBoost</a>.<br /><small>This message will not be shown again to you.</small>', 'success');
 
         $plugins['BankPipe']['ad_shown'][] = $mybb->user['uid'];
         $cache->update('shade_plugins', $plugins);
