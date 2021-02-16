@@ -112,8 +112,8 @@ class Coinbase extends Core
     public function webhookListener()
     {
         // Verify signature
-        $headerName = 'X-Cc-Webhook-Signature';
-        $headers = getallheaders();
+        $headerName = 'x-cc-webhook-signature';
+        $headers = array_change_key_case(getallheaders(), CASE_LOWER);
         $signatureHeader = isset($headers[$headerName]) ? $headers[$headerName] : '';
         $notdecoded = trim(file_get_contents('php://input'));
         $payload = json_decode($notdecoded);
